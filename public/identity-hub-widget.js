@@ -64,8 +64,11 @@
       { appName: "Your app", theme: "light", providers: Object.keys(supported), mode: "sandbox" },
       options || {},
     );
-    if (opt.mode !== "sandbox") {
-      throw new Error("Live OAuth requires a production identity broker. This widget supports sandbox mode only.");
+    if (opt.mode !== "sandbox" && opt.mode !== "live") {
+      throw new Error("IdentityHub mode must be sandbox or live.");
+    }
+    if (opt.mode === "live" && !opt.clientId) {
+      throw new Error("Live mode requires a clientId from the Identity Hub workspace.");
     }
     var ids = (opt.providers || []).filter(function (id) {
       return Object.prototype.hasOwnProperty.call(supported, id);
@@ -86,7 +89,10 @@
     title.textContent = appName;
     var lead = document.createElement("p");
     lead.className = "lead";
-    lead.textContent = "Choose sandbox accounts to request. No login token is issued.";
+    lead.textContent =
+      opt.mode === "live"
+        ? "Choose the platforms this app should request. You will confirm the connection on Identity Hub."
+        : "Choose sandbox accounts to request. No login token is issued.";
     var fieldset = document.createElement("fieldset");
     var legend = document.createElement("legend");
     legend.textContent = "Platforms";
@@ -107,16 +113,28 @@
     });
     var submit = document.createElement("button");
     submit.type = "button";
-    submit.textContent = "Continue in sandbox";
+    submit.textContent = opt.mode === "live" ? "Continue to Identity Hub" : "Continue in sandbox";
     var result = document.createElement("p");
     result.className = "result";
     result.setAttribute("role", "status");
     var foot = document.createElement("small");
-    foot.textContent = "Powered by Makketing · Sandbox only. No login token is issued.";
+    foot.textContent =
+      opt.mode === "live"
+        ? "Powered by Makketing · You approve the connection before any access token is issued."
+        : "Powered by Makketing · Sandbox only. No login token is issued.";
     card.append(kicker, title, lead, fieldset, submit, result, foot);
     root.append(style, card);
 
     submit.addEventListener("click", function () {
+      if (opt.mode === "live") {
+        var base = String(opt.hubOrigin || window.location.origin).replace(/\/$/, "");
+        var next = new URL(base + "/connect");
+        next.searchParams.set("client_id", String(opt.clientId));
+        if (opt.redirectUri) next.searchParams.set("redirect_uri", String(opt.redirectUri));
+        next.searchParams.set("providers", ids.filter(function (id) { return selected.has(id); }).join(","));
+        window.location.assign(next.toString());
+        return;
+      }
       var platforms = ids.filter(function (id) {
         return selected.has(id);
       });
