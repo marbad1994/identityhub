@@ -51,7 +51,9 @@ Use `{APP_ORIGIN}/deletion` as the data deletion URL and `{APP_ORIGIN}/privacy` 
 
 The image is published to `ghcr.io/marbad1994/identityhub` by `.github/workflows/docker-publish.yml` on every push to `main`.
 
-`docker-compose.yml` runs the hub and its own Postgres as the isolated project `identityhub`: its own network, volume and container names, nothing on ports 80/443, and the app bound to `127.0.0.1:8316` only, so it does not touch other stacks on the host. The container applies pending migrations on start.
+`docker-compose.yml` runs the hub and its own Postgres as the isolated project `identityhub`: its own network, volume and container names, and nothing on ports 80/443, so it does not touch other stacks on the host. The app listens on port 8316 on every interface, so it answers both at `http://<server-ip>:8316` and through the reverse proxy on its domain; set `IDENTITYHUB_BIND=127.0.0.1` to keep it proxy-only.
+
+On the IP address, pages and the app API (`/api/v1/*`) work directly. Signing in always finishes on `APP_ORIGIN`: platforms only redirect to the registered https callback, and the session cookie is `Secure` when `APP_ORIGIN` is https, so a browser keeps it only on the domain. The container applies pending migrations on start.
 
 ```bash
 cp .env.example .env

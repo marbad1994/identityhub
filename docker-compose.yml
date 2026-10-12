@@ -13,7 +13,9 @@ services:
     environment:
       DATABASE_URL: postgres://identityhub:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/identityhub
     ports:
-      - "127.0.0.1:8316:8080"
+      # Public by default so http://<server-ip>:8316 works next to the domain.
+      # Set IDENTITYHUB_BIND=127.0.0.1 to reach it only through the reverse proxy.
+      - "${IDENTITYHUB_BIND:-0.0.0.0}:8316:8080"
     depends_on:
       db:
         condition: service_healthy
