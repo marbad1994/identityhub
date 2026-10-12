@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SiteFooter, SiteHeader } from "@/components/shell";
+import { Page } from "@/components/shell";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({ meta: [{ title: "Privacy Policy · Identity Hub" }] }),
@@ -8,19 +8,24 @@ export const Route = createFileRoute("/privacy")({
 
 function Privacy() {
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-3xl px-5 py-16">
-        <h1 className="text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-        <div className="mt-6 space-y-4 text-muted">
-          <p>Identity Hub stores the workspace owner’s account, registered app origins, connection handles, granted scopes, and an audit log.</p>
-          <p>Live provider access and refresh tokens are encrypted with TOKEN_ENCRYPTION_KEY before they are written. They are not included in exports, the widget, or product tokens.</p>
-          <p>Sandbox profiles are labels you type. They are not sent to X, Meta, TikTok, LinkedIn, Google, or Reddit.</p>
-          <p>Stripe receives the billing customer id and subscription status. We do not store card numbers.</p>
-          <p>To remove workspace data, use the Data Deletion page or email support@socialpostapi.makketing.com.</p>
-        </div>
-      </main>
-      <SiteFooter />
-    </>
+    <Page width="max-w-3xl">
+      <h1 className="text-4xl font-semibold tracking-tight">Privacy Policy</h1>
+      <div className="mt-6 space-y-4 text-muted">
+        <p>
+          When you sign in or connect an account, Identity Hub stores the platform account id, name, handle and picture the
+          platform returns, plus its access and refresh tokens. Tokens are encrypted with AES-256-GCM before they are written.
+        </p>
+        <p>
+          An app you authorize receives your Identity Hub user id, name and picture, and the name, handle and picture of the
+          accounts you chose. Only for accounts granted with publish access can the app request that account's platform access
+          token, from its server, to post on your behalf.
+        </p>
+        <p>We keep a log of sign-ins, connections and grants so you can see who has access. We do not sell data.</p>
+        <p>
+          Disconnecting an account or removing an app takes effect immediately. To delete everything, use the Data Deletion page
+          or email support@makketing.com.
+        </p>
+      </div>
+    </Page>
   );
 }

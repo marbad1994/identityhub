@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthorizeRouteImport } from './routes/authorize'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as DemoRouteImport } from './routes/demo'
@@ -19,15 +20,28 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WorkspaceRouteImport } from './routes/workspace'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
+import { Route as ApiAuthStartRouteImport } from './routes/api/auth/start'
 import { Route as ApiOauthCallbackRouteImport } from './routes/api/oauth/callback'
 import { Route as ApiOauthIntrospectRouteImport } from './routes/api/oauth/introspect'
 import { Route as ApiOauthTokenRouteImport } from './routes/api/oauth/token'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
+import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
+import { Route as ApiAuthCallbackPlatformRouteImport } from './routes/api/auth/callback.$platform'
+import { Route as ApiV1OauthRevokeRouteImport } from './routes/api/v1/oauth/revoke'
+import { Route as ApiV1OauthTokenRouteImport } from './routes/api/v1/oauth/token'
+import { Route as ApiV1AccountsAccountIdTokenRouteImport } from './routes/api/v1/accounts.$accountId.token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthorizeRoute = AuthorizeRouteImport.update({
+  id: '/authorize',
+  path: '/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectRoute = ConnectRouteImport.update({
@@ -75,9 +89,24 @@ const WorkspaceRoute = WorkspaceRouteImport.update({
   path: '/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthStartRoute = ApiAuthStartRouteImport.update({
+  id: '/api/auth/start',
+  path: '/api/auth/start',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOauthCallbackRoute = ApiOauthCallbackRouteImport.update({
@@ -100,9 +129,36 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1MeRoute = ApiV1MeRouteImport.update({
+  id: '/api/v1/me',
+  path: '/api/v1/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthCallbackPlatformRoute = ApiAuthCallbackPlatformRouteImport.update({
+  id: '/api/auth/callback/$platform',
+  path: '/api/auth/callback/$platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1OauthRevokeRoute = ApiV1OauthRevokeRouteImport.update({
+  id: '/api/v1/oauth/revoke',
+  path: '/api/v1/oauth/revoke',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1OauthTokenRoute = ApiV1OauthTokenRouteImport.update({
+  id: '/api/v1/oauth/token',
+  path: '/api/v1/oauth/token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1AccountsAccountIdTokenRoute =
+  ApiV1AccountsAccountIdTokenRouteImport.update({
+    id: '/api/v1/accounts/$accountId/token',
+    path: '/api/v1/accounts/$accountId/token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
   '/demo': typeof DemoRoute
@@ -112,14 +168,23 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/start': typeof ApiAuthStartRoute
   '/api/oauth/callback': typeof ApiOauthCallbackRoute
   '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
   '/api/oauth/token': typeof ApiOauthTokenRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
+  '/api/v1/me': typeof ApiV1MeRoute
+  '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
+  '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
   '/demo': typeof DemoRoute
@@ -129,15 +194,24 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/start': typeof ApiAuthStartRoute
   '/api/oauth/callback': typeof ApiOauthCallbackRoute
   '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
   '/api/oauth/token': typeof ApiOauthTokenRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
+  '/api/v1/me': typeof ApiV1MeRoute
+  '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
+  '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
   '/demo': typeof DemoRoute
@@ -147,16 +221,25 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/start': typeof ApiAuthStartRoute
   '/api/oauth/callback': typeof ApiOauthCallbackRoute
   '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
   '/api/oauth/token': typeof ApiOauthTokenRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
+  '/api/v1/me': typeof ApiV1MeRoute
+  '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
+  '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/authorize'
     | '/connect'
     | '/deletion'
     | '/demo'
@@ -166,14 +249,23 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/workspace'
+    | '/api/health'
     | '/api/auth/$'
+    | '/api/auth/logout'
+    | '/api/auth/start'
     | '/api/oauth/callback'
     | '/api/oauth/introspect'
     | '/api/oauth/token'
     | '/api/stripe/webhook'
+    | '/api/v1/me'
+    | '/api/auth/callback/$platform'
+    | '/api/v1/oauth/revoke'
+    | '/api/v1/oauth/token'
+    | '/api/v1/accounts/$accountId/token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/authorize'
     | '/connect'
     | '/deletion'
     | '/demo'
@@ -183,14 +275,23 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/workspace'
+    | '/api/health'
     | '/api/auth/$'
+    | '/api/auth/logout'
+    | '/api/auth/start'
     | '/api/oauth/callback'
     | '/api/oauth/introspect'
     | '/api/oauth/token'
     | '/api/stripe/webhook'
+    | '/api/v1/me'
+    | '/api/auth/callback/$platform'
+    | '/api/v1/oauth/revoke'
+    | '/api/v1/oauth/token'
+    | '/api/v1/accounts/$accountId/token'
   id:
     | '__root__'
     | '/'
+    | '/authorize'
     | '/connect'
     | '/deletion'
     | '/demo'
@@ -200,15 +301,24 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/workspace'
+    | '/api/health'
     | '/api/auth/$'
+    | '/api/auth/logout'
+    | '/api/auth/start'
     | '/api/oauth/callback'
     | '/api/oauth/introspect'
     | '/api/oauth/token'
     | '/api/stripe/webhook'
+    | '/api/v1/me'
+    | '/api/auth/callback/$platform'
+    | '/api/v1/oauth/revoke'
+    | '/api/v1/oauth/token'
+    | '/api/v1/accounts/$accountId/token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthorizeRoute: typeof AuthorizeRoute
   ConnectRoute: typeof ConnectRoute
   DeletionRoute: typeof DeletionRoute
   DemoRoute: typeof DemoRoute
@@ -218,11 +328,19 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthStartRoute: typeof ApiAuthStartRoute
   ApiOauthCallbackRoute: typeof ApiOauthCallbackRoute
   ApiOauthIntrospectRoute: typeof ApiOauthIntrospectRoute
   ApiOauthTokenRoute: typeof ApiOauthTokenRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
+  ApiV1MeRoute: typeof ApiV1MeRoute
+  ApiAuthCallbackPlatformRoute: typeof ApiAuthCallbackPlatformRoute
+  ApiV1OauthRevokeRoute: typeof ApiV1OauthRevokeRoute
+  ApiV1OauthTokenRoute: typeof ApiV1OauthTokenRoute
+  ApiV1AccountsAccountIdTokenRoute: typeof ApiV1AccountsAccountIdTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/authorize': {
+      id: '/authorize'
+      path: '/authorize'
+      fullPath: '/authorize'
+      preLoaderRoute: typeof AuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connect': {
@@ -297,11 +422,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/start': {
+      id: '/api/auth/start'
+      path: '/api/auth/start'
+      fullPath: '/api/auth/start'
+      preLoaderRoute: typeof ApiAuthStartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/oauth/callback': {
@@ -332,11 +478,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/me': {
+      id: '/api/v1/me'
+      path: '/api/v1/me'
+      fullPath: '/api/v1/me'
+      preLoaderRoute: typeof ApiV1MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/callback/$platform': {
+      id: '/api/auth/callback/$platform'
+      path: '/api/auth/callback/$platform'
+      fullPath: '/api/auth/callback/$platform'
+      preLoaderRoute: typeof ApiAuthCallbackPlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/oauth/revoke': {
+      id: '/api/v1/oauth/revoke'
+      path: '/api/v1/oauth/revoke'
+      fullPath: '/api/v1/oauth/revoke'
+      preLoaderRoute: typeof ApiV1OauthRevokeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/oauth/token': {
+      id: '/api/v1/oauth/token'
+      path: '/api/v1/oauth/token'
+      fullPath: '/api/v1/oauth/token'
+      preLoaderRoute: typeof ApiV1OauthTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/accounts/$accountId/token': {
+      id: '/api/v1/accounts/$accountId/token'
+      path: '/api/v1/accounts/$accountId/token'
+      fullPath: '/api/v1/accounts/$accountId/token'
+      preLoaderRoute: typeof ApiV1AccountsAccountIdTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthorizeRoute: AuthorizeRoute,
   ConnectRoute: ConnectRoute,
   DeletionRoute: DeletionRoute,
   DemoRoute: DemoRoute,
@@ -346,11 +528,19 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   WorkspaceRoute: WorkspaceRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthStartRoute: ApiAuthStartRoute,
   ApiOauthCallbackRoute: ApiOauthCallbackRoute,
   ApiOauthIntrospectRoute: ApiOauthIntrospectRoute,
   ApiOauthTokenRoute: ApiOauthTokenRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
+  ApiV1MeRoute: ApiV1MeRoute,
+  ApiAuthCallbackPlatformRoute: ApiAuthCallbackPlatformRoute,
+  ApiV1OauthRevokeRoute: ApiV1OauthRevokeRoute,
+  ApiV1OauthTokenRoute: ApiV1OauthTokenRoute,
+  ApiV1AccountsAccountIdTokenRoute: ApiV1AccountsAccountIdTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,40 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { SIGN_IN_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
-import { SiteFooter, SiteHeader } from "@/components/shell";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { ErrorNote, Page, useSession } from "@/components/shell";
+import { PlatformButtons } from "@/components/platform-buttons";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in · Identity Hub" }] }),
+  validateSearch: (search: Record<string, unknown>): { return_to?: string; error?: string } => ({
+    return_to: typeof search.return_to === "string" ? search.return_to : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
+  }),
   component: Login,
 });
 
 function Login() {
+  const { user, platforms } = useSession();
+  const { return_to: returnTo = "/workspace", error } = Route.useSearch();
+  if (user && !error) return <Navigate to="/workspace" />;
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto grid min-h-[70vh] max-w-md place-items-center px-5 py-16">
-        <div className="w-full rounded-card border border-line bg-bg p-8 shadow-card">
-          <p className="text-sm font-semibold text-muted">Identity Hub</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Sign in</h1>
-          <p className="mt-2 text-sm text-muted">Choose a platform. This is the workspace owner, not a connected social profile.</p>
-          <div className="mt-6 grid gap-2">
-            {authEnabled ? (
-              SIGN_IN_PROVIDERS.map((provider) => (
-                <button
-                  key={provider.providerId}
-                  type="button"
-                  onClick={() => signIn(provider.providerId, { callbackURL: "/workspace" })}
-                  className="min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink"
-                >
-                  Continue with {provider.label}
-                </button>
-              ))
-            ) : (
-              <p className="text-sm text-muted">Sign-in is not enabled on this build.</p>
-            )}
-          </div>
-        </div>
-      </main>
-      <SiteFooter />
-    </>
+    <Page width="max-w-lg">
+      <h1 className="text-4xl font-semibold tracking-tight">Sign in</h1>
+      <p className="mt-3 text-muted">
+        Use any platform you post on. The account you sign in with is connected too, and you can add more afterwards.
+      </p>
+      <ErrorNote message={error} />
+      <div className="mt-8">
+        <PlatformButtons platforms={platforms} intent="login" returnTo={returnTo} verb="Continue with" />
+      </div>
+    </Page>
   );
 }

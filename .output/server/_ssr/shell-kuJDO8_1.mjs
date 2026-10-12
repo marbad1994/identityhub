@@ -1,0 +1,176 @@
+import { C as require_jsx_runtime, x as useLoaderData, y as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { a as Ghost, r as LogOut } from "../_libs/lucide-react.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/shell-kuJDO8_1.js
+var import_jsx_runtime = require_jsx_runtime();
+function Mark({ className }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+		viewBox: "0 0 32 32",
+		className,
+		"aria-hidden": "true",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+				width: "32",
+				height: "32",
+				rx: "8",
+				className: "fill-ink"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+				cx: "12.5",
+				cy: "16",
+				r: "4.25",
+				className: "stroke-on-ink",
+				fill: "none",
+				strokeWidth: "1.7"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+				cx: "19.5",
+				cy: "16",
+				r: "4.25",
+				className: "stroke-on-ink",
+				fill: "none",
+				strokeWidth: "1.7"
+			})
+		]
+	});
+}
+var paths = {
+	twitter: "M14.23 10.16 22.98 0h-2.07l-7.59 8.82L7.25 0H.26l9.17 13.34L.26 24h2.07l8.02-9.32L16.75 24h6.99l-9.51-13.84Zm-2.84 3.3-.93-1.33L3.08 1.56h3.18l5.97 8.53.93 1.33 7.75 11.09h-3.18l-6.34-9.05Z",
+	instagram: "M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.1 0-3.5 0-4.7.1-1 .1-1.6.2-2 .4-.4.2-.7.4-1 .7-.3.3-.5.6-.7 1-.2.4-.3 1-.4 2-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1 .2 1.6.4 2 .2.4.4.7.7 1 .3.3.6.5 1 .7.4.2 1 .3 2 .4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1-.1 1.6-.2 2-.4.4-.2.7-.4 1-.7.3-.3.5-.6.7-1 .2-.4.3-1 .4-2 .1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1-.2-1.6-.4-2-.2-.4-.4-.7-.7-1-.3-.3-.6-.5-1-.7-.4-.2-1-.3-2-.4-1.2-.1-1.6-.1-4.7-.1Zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8Zm0 1.8a3.1 3.1 0 1 0 0 6.2 3.1 3.1 0 0 0 0-6.2Zm6.2-2.2a1.15 1.15 0 1 1-2.3 0 1.15 1.15 0 0 1 2.3 0Z",
+	facebook: "M14.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.3-1.5 1.6-1.5H18V4.9c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9V11H9v3h2.9v8h2.6Z",
+	tiktok: "M16.6 3c.4 2.6 1.9 4.3 4.4 4.6v2.6c-1.5 0-2.9-.5-4.1-1.3v6.4c0 4.1-3 6.7-6.6 6.7A6.3 6.3 0 0 1 4 15.6c0-3.5 2.8-6.3 6.4-6.3.4 0 .8 0 1.2.1v2.8a3.7 3.7 0 0 0-1.2-.2 3.5 3.5 0 0 0-3.6 3.6 3.5 3.5 0 0 0 5.8 2.6 3.4 3.4 0 0 0 1.2-2.7V3h2.8Z",
+	linkedin: "M5.7 8.7a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM4.2 20.5V10h3.1v10.5H4.2Zm5.1 0V10h3v1.4h.1c.4-.8 1.5-1.6 3-1.6 3.2 0 3.8 2.1 3.8 4.8v5.9h-3.1v-5.2c0-1.2 0-2.8-1.7-2.8s-2 1.3-2 2.7v5.3H9.3Z",
+	youtube: "M22.5 7.2a2.8 2.8 0 0 0-2-2C18.8 4.8 12 4.8 12 4.8s-6.8 0-8.5.4a2.8 2.8 0 0 0-2 2A29 29 0 0 0 1.1 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.4 8.5.4 8.5.4s6.8 0 8.5-.4a2.8 2.8 0 0 0 2-2 29 29 0 0 0 .4-4.8 29 29 0 0 0-.4-4.8ZM10.2 15.2V8.8L15.6 12l-5.4 3.2Z",
+	reddit: "M12 3.2a1.5 1.5 0 0 0-1.5 1.6c0 .3.1.6.2.8L6.4 7.1a2 2 0 1 0 .2 1.1l4.2-1.4c.4.2.8.3 1.2.3s.8-.1 1.2-.3l4.2 1.4a2 2 0 1 0 .2-1.1L13.3 5.6c.1-.2.2-.5.2-.8A1.5 1.5 0 0 0 12 3.2Zm-4.4 8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Zm8.8 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4ZM8.2 16.6c.2.3.6.4 1 .4.8 0 1.5-.4 2.1-.8.2-.1.5-.1.7 0 .6.4 1.3.8 2.1.8.4 0 .8-.1 1-.4.3-.3.7-.3 1 0s.3.7 0 1c-.4.5-1.1.8-2 .8-1 0-1.8-.5-2.4-1.1a3.4 3.4 0 0 1-2.4 1.1c-.9 0-1.6-.3-2-.8-.3-.3-.3-.7 0-1 .3-.3.7-.3.9 0Z"
+};
+function PlatformIcon({ id, className }) {
+	if (!paths[id]) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Ghost, {
+		className,
+		"aria-hidden": "true"
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+		viewBox: "0 0 24 24",
+		className,
+		"aria-hidden": "true",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+			fill: "currentColor",
+			d: paths[id]
+		})
+	});
+}
+function useSession() {
+	return useLoaderData({ from: "__root__" });
+}
+function SignOutButton() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("form", {
+		method: "post",
+		action: "/api/auth/logout",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "submit",
+			className: "inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-muted hover:text-fg",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LogOut, {
+				className: "size-4",
+				"aria-hidden": "true"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "sr-only sm:not-sr-only",
+				children: "Sign out"
+			})]
+		})
+	});
+}
+function SiteHeader() {
+	const { user } = useSession();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("header", {
+		className: "sticky top-0 z-40 border-b border-line bg-bg/80 backdrop-blur-xl",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-5",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+				to: "/",
+				className: "flex items-center gap-2.5 text-fg no-underline",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mark, { className: "size-7" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: "text-base font-bold tracking-tight",
+					children: ["Identity", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "font-semibold text-muted",
+						children: " Hub"
+					})]
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", {
+				"aria-label": "Main",
+				className: "flex items-center gap-1",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/docs",
+					className: "inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg",
+					children: "Docs"
+				}), user ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/workspace",
+					className: "inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-sm font-semibold text-on-ink no-underline hover:opacity-85",
+					children: "Workspace"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SignOutButton, {})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/login",
+					className: "inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-sm font-semibold text-on-ink no-underline hover:opacity-85",
+					children: "Sign in"
+				})]
+			})]
+		})
+	});
+}
+function SiteFooter() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("footer", {
+		className: "border-t border-line",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "mx-auto flex max-w-5xl flex-col gap-4 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-5",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-sm text-muted",
+				children: "Identity Hub, part of the Makketing suite."
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap gap-x-5 gap-y-2 text-sm",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/docs",
+						className: "text-muted no-underline hover:text-fg",
+						children: "Docs"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/privacy",
+						className: "text-muted no-underline hover:text-fg",
+						children: "Privacy Policy"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/terms",
+						className: "text-muted no-underline hover:text-fg",
+						children: "Terms of Service"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/deletion",
+						className: "text-muted no-underline hover:text-fg",
+						children: "Data Deletion"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+						href: "mailto:support@makketing.com",
+						className: "text-link no-underline hover:underline",
+						children: "support@makketing.com"
+					})
+				]
+			})]
+		})
+	});
+}
+function Page({ children, width = "max-w-5xl" }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SiteHeader, {}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+			className: `mx-auto ${width} px-4 py-12 sm:px-5 sm:py-16`,
+			children
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SiteFooter, {})
+	] });
+}
+function ErrorNote({ message }) {
+	if (!message) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		role: "alert",
+		className: "mt-4 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger",
+		children: message
+	});
+}
+//#endregion
+export { SiteHeader as a, SiteFooter as i, Page as n, useSession as o, PlatformIcon as r, ErrorNote as t };
