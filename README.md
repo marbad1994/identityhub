@@ -57,9 +57,12 @@ On the IP address, pages and the app API (`/api/v1/*`) work directly. Signing in
 
 ```bash
 cp .env.example .env
+bash scripts/env-from-socialpostapi.sh /opt/socialpostapi/.env .env https://identity.makketing.com
 vi .env
 docker compose pull && docker compose up -d
 ```
+
+`scripts/env-from-socialpostapi.sh` copies the platform credentials from SocialPostAPI's `.env` on the same host, generates `POSTGRES_PASSWORD` and `TOKEN_ENCRYPTION_KEY`, never overwrites a value that is already set, and prints names only.
 
 Route a hostname to it from the host's existing reverse proxy, for example Makketing's Caddy:
 
