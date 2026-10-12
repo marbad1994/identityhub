@@ -1,0 +1,43 @@
+# Self-contained stack. Own project name, network, volume and containers, and
+# nothing bound to 80/443 or a public interface, so it cannot collide with other
+# stacks on the host. Front it with the host's existing reverse proxy.
+name: identityhub
+
+services:
+  app:
+    image: ${IDENTITYHUB_IMAGE:-ghcr.io/marbad1994/identityhub:latest}
+    build: .
+    container_name: identityhub-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://identityhub:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/identityhub
+    ports:
+      - "127.0.0.1:8316:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+  db:
+    image: postgres:16-alpine
+    container_name: identityhub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: identityhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: identityhub
+    volumes:
+      - identityhub_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identityhub -d identityhub"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  identityhub_pgdata:

@@ -13,6 +13,28 @@ npm run dev
 
 The app listens on port 8080. With no database URL it uses embedded Postgres. Set `DATABASE_URL` in production.
 
+## Docker deploy
+
+The image is published to `ghcr.io/marbad1994/identityhub` by `.github/workflows/docker-publish.yml` on every push to `main` (tags: `latest`, `sha-*`, and `v*` releases).
+
+`docker-compose.yml` runs the app plus its own Postgres as the isolated project `identityhub`: its own network, volume, and container names, no ports on 80/443, and the app bound to `127.0.0.1:8316` only. It does not touch other stacks on the host.
+
+```bash
+cp .env.example .env   # fill in, see Host configuration
+vi .env
+docker compose pull && docker compose up -d
+```
+
+The container applies pending migrations on start and refuses to start without `DATABASE_URL` (compose sets it). Route a hostname to it from the existing reverse proxy, for example in Caddy:
+
+```text
+identity.example.com {
+	reverse_proxy host.docker.internal:8316
+}
+```
+
+If the package is private, run `docker login ghcr.io` on the server first.
+
 ## What works before keys
 
 - Workspace per signed-in owner
