@@ -42,7 +42,9 @@ async function main() {
       }
       console.log(`[migrate] applied ${name}`);
     }
-    console.log(pending.length ? `[migrate] done, ${pending.length} applied.` : "[migrate] up to date.");
+    console.log(
+      pending.length ? `[migrate] done, ${pending.length} applied.` : "[migrate] up to date.",
+    );
   } finally {
     await client.end();
   }

@@ -11,23 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthorizeRouteImport } from './routes/authorize'
-import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as DeletionRouteImport } from './routes/deletion'
-import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStartRouteImport } from './routes/api/auth/start'
-import { Route as ApiOauthCallbackRouteImport } from './routes/api/oauth/callback'
-import { Route as ApiOauthIntrospectRouteImport } from './routes/api/oauth/introspect'
-import { Route as ApiOauthTokenRouteImport } from './routes/api/oauth/token'
-import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiAuthCallbackPlatformRouteImport } from './routes/api/auth/callback.$platform'
 import { Route as ApiV1OauthRevokeRouteImport } from './routes/api/v1/oauth/revoke'
@@ -44,19 +36,9 @@ const AuthorizeRoute = AuthorizeRouteImport.update({
   path: '/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ConnectRoute = ConnectRouteImport.update({
-  id: '/connect',
-  path: '/connect',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DeletionRoute = DeletionRouteImport.update({
   id: '/deletion',
   path: '/deletion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoRoute = DemoRouteImport.update({
-  id: '/demo',
-  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRoute = DocsRouteImport.update({
@@ -67,11 +49,6 @@ const DocsRoute = DocsRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -94,11 +71,6 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
   id: '/api/auth/logout',
   path: '/api/auth/logout',
@@ -107,26 +79,6 @@ const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
 const ApiAuthStartRoute = ApiAuthStartRouteImport.update({
   id: '/api/auth/start',
   path: '/api/auth/start',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOauthCallbackRoute = ApiOauthCallbackRouteImport.update({
-  id: '/api/oauth/callback',
-  path: '/api/oauth/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOauthIntrospectRoute = ApiOauthIntrospectRouteImport.update({
-  id: '/api/oauth/introspect',
-  path: '/api/oauth/introspect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOauthTokenRoute = ApiOauthTokenRouteImport.update({
-  id: '/api/oauth/token',
-  path: '/api/oauth/token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
-  id: '/api/stripe/webhook',
-  path: '/api/stripe/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiV1MeRoute = ApiV1MeRouteImport.update({
@@ -159,23 +111,15 @@ const ApiV1AccountsAccountIdTokenRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
-  '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
-  '/demo': typeof DemoRoute
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
-  '/api/oauth/callback': typeof ApiOauthCallbackRoute
-  '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
-  '/api/oauth/token': typeof ApiOauthTokenRoute
-  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
@@ -185,23 +129,15 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
-  '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
-  '/demo': typeof DemoRoute
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
-  '/api/oauth/callback': typeof ApiOauthCallbackRoute
-  '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
-  '/api/oauth/token': typeof ApiOauthTokenRoute
-  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
@@ -212,23 +148,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
-  '/connect': typeof ConnectRoute
   '/deletion': typeof DeletionRoute
-  '/demo': typeof DemoRoute
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
-  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
-  '/api/oauth/callback': typeof ApiOauthCallbackRoute
-  '/api/oauth/introspect': typeof ApiOauthIntrospectRoute
-  '/api/oauth/token': typeof ApiOauthTokenRoute
-  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/v1/me': typeof ApiV1MeRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
@@ -240,23 +168,15 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/authorize'
-    | '/connect'
     | '/deletion'
-    | '/demo'
     | '/docs'
     | '/login'
-    | '/pricing'
     | '/privacy'
     | '/terms'
     | '/workspace'
     | '/api/health'
-    | '/api/auth/$'
     | '/api/auth/logout'
     | '/api/auth/start'
-    | '/api/oauth/callback'
-    | '/api/oauth/introspect'
-    | '/api/oauth/token'
-    | '/api/stripe/webhook'
     | '/api/v1/me'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
@@ -266,23 +186,15 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/authorize'
-    | '/connect'
     | '/deletion'
-    | '/demo'
     | '/docs'
     | '/login'
-    | '/pricing'
     | '/privacy'
     | '/terms'
     | '/workspace'
     | '/api/health'
-    | '/api/auth/$'
     | '/api/auth/logout'
     | '/api/auth/start'
-    | '/api/oauth/callback'
-    | '/api/oauth/introspect'
-    | '/api/oauth/token'
-    | '/api/stripe/webhook'
     | '/api/v1/me'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
@@ -292,23 +204,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/authorize'
-    | '/connect'
     | '/deletion'
-    | '/demo'
     | '/docs'
     | '/login'
-    | '/pricing'
     | '/privacy'
     | '/terms'
     | '/workspace'
     | '/api/health'
-    | '/api/auth/$'
     | '/api/auth/logout'
     | '/api/auth/start'
-    | '/api/oauth/callback'
-    | '/api/oauth/introspect'
-    | '/api/oauth/token'
-    | '/api/stripe/webhook'
     | '/api/v1/me'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
@@ -319,23 +223,15 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthorizeRoute: typeof AuthorizeRoute
-  ConnectRoute: typeof ConnectRoute
   DeletionRoute: typeof DeletionRoute
-  DemoRoute: typeof DemoRoute
   DocsRoute: typeof DocsRoute
   LoginRoute: typeof LoginRoute
-  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   WorkspaceRoute: typeof WorkspaceRoute
   ApiHealthRoute: typeof ApiHealthRoute
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStartRoute: typeof ApiAuthStartRoute
-  ApiOauthCallbackRoute: typeof ApiOauthCallbackRoute
-  ApiOauthIntrospectRoute: typeof ApiOauthIntrospectRoute
-  ApiOauthTokenRoute: typeof ApiOauthTokenRoute
-  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
   ApiAuthCallbackPlatformRoute: typeof ApiAuthCallbackPlatformRoute
   ApiV1OauthRevokeRoute: typeof ApiV1OauthRevokeRoute
@@ -359,25 +255,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/connect': {
-      id: '/connect'
-      path: '/connect'
-      fullPath: '/connect'
-      preLoaderRoute: typeof ConnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/deletion': {
       id: '/deletion'
       path: '/deletion'
       fullPath: '/deletion'
       preLoaderRoute: typeof DeletionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo': {
-      id: '/demo'
-      path: '/demo'
-      fullPath: '/demo'
-      preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -392,13 +274,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -429,13 +304,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/logout': {
       id: '/api/auth/logout'
       path: '/api/auth/logout'
@@ -448,34 +316,6 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/start'
       fullPath: '/api/auth/start'
       preLoaderRoute: typeof ApiAuthStartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/oauth/callback': {
-      id: '/api/oauth/callback'
-      path: '/api/oauth/callback'
-      fullPath: '/api/oauth/callback'
-      preLoaderRoute: typeof ApiOauthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/oauth/introspect': {
-      id: '/api/oauth/introspect'
-      path: '/api/oauth/introspect'
-      fullPath: '/api/oauth/introspect'
-      preLoaderRoute: typeof ApiOauthIntrospectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/oauth/token': {
-      id: '/api/oauth/token'
-      path: '/api/oauth/token'
-      fullPath: '/api/oauth/token'
-      preLoaderRoute: typeof ApiOauthTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/stripe/webhook': {
-      id: '/api/stripe/webhook'
-      path: '/api/stripe/webhook'
-      fullPath: '/api/stripe/webhook'
-      preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/v1/me': {
@@ -519,23 +359,15 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthorizeRoute: AuthorizeRoute,
-  ConnectRoute: ConnectRoute,
   DeletionRoute: DeletionRoute,
-  DemoRoute: DemoRoute,
   DocsRoute: DocsRoute,
   LoginRoute: LoginRoute,
-  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   WorkspaceRoute: WorkspaceRoute,
   ApiHealthRoute: ApiHealthRoute,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStartRoute: ApiAuthStartRoute,
-  ApiOauthCallbackRoute: ApiOauthCallbackRoute,
-  ApiOauthIntrospectRoute: ApiOauthIntrospectRoute,
-  ApiOauthTokenRoute: ApiOauthTokenRoute,
-  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiV1MeRoute: ApiV1MeRoute,
   ApiAuthCallbackPlatformRoute: ApiAuthCallbackPlatformRoute,
   ApiV1OauthRevokeRoute: ApiV1OauthRevokeRoute,

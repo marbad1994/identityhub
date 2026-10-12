@@ -33,10 +33,17 @@ export const instagram: Platform = {
     // Trade the short-lived token for a long-lived one (about 60 days).
     const long = await requestJson(
       "Instagram",
-      withQuery(LONG_LIVED_URL, { grant_type: "ig_exchange_token", client_secret: creds.clientSecret, access_token: short.access_token }),
+      withQuery(LONG_LIVED_URL, {
+        grant_type: "ig_exchange_token",
+        client_secret: creds.clientSecret,
+        access_token: short.access_token,
+      }),
     );
     const accessToken: string = long.access_token ?? short.access_token;
-    const me = await requestJson("Instagram", withQuery(ME_URL, { fields: "id,username,profile_picture_url", access_token: accessToken }));
+    const me = await requestJson(
+      "Instagram",
+      withQuery(ME_URL, { fields: "id,username,profile_picture_url", access_token: accessToken }),
+    );
     const id = String(me.id ?? short.user_id);
     const handle = me.username ?? id;
     return {
@@ -57,7 +64,10 @@ export const instagram: Platform = {
     };
   },
   async refresh({ tokens }) {
-    const next = await requestJson("Instagram", withQuery(REFRESH_URL, { grant_type: "ig_refresh_token", access_token: tokens.accessToken }));
+    const next = await requestJson(
+      "Instagram",
+      withQuery(REFRESH_URL, { grant_type: "ig_refresh_token", access_token: tokens.accessToken }),
+    );
     return { accessToken: next.access_token, expiresAt: expiresAt(next.expires_in) };
   },
 };

@@ -13,14 +13,7 @@ export type ScopeId = keyof typeof SCOPES;
 export const SCOPE_IDS = Object.keys(SCOPES) as ScopeId[];
 
 export type PlatformId =
-  | "twitter"
-  | "instagram"
-  | "facebook"
-  | "tiktok"
-  | "linkedin"
-  | "youtube"
-  | "reddit"
-  | "snapchat";
+  "twitter" | "instagram" | "facebook" | "tiktok" | "linkedin" | "youtube" | "reddit" | "snapchat";
 
 export type PlatformInfo = {
   id: PlatformId;
@@ -53,7 +46,8 @@ export function platformLabel(id: string): string {
 export function parseScopes(value: string | null | undefined): ScopeId[] {
   const out: ScopeId[] = [];
   for (const part of (value ?? "").split(/[\s,]+/)) {
-    if ((SCOPE_IDS as string[]).includes(part) && !out.includes(part as ScopeId)) out.push(part as ScopeId);
+    if ((SCOPE_IDS as string[]).includes(part) && !out.includes(part as ScopeId))
+      out.push(part as ScopeId);
   }
   return out;
 }

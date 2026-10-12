@@ -22,9 +22,17 @@ export const linkedin: Platform = {
     const tokens = await requestJson("LinkedIn", TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: creds.clientId, client_secret: creds.clientSecret }),
+      body: form({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+      }),
     });
-    const user = await requestJson("LinkedIn", USERINFO_URL, { headers: bearer(tokens.access_token) });
+    const user = await requestJson("LinkedIn", USERINFO_URL, {
+      headers: bearer(tokens.access_token),
+    });
     const id = String(user.sub);
     const name = user.name ?? id;
     return {
@@ -50,8 +58,17 @@ export const linkedin: Platform = {
     const next = await requestJson("LinkedIn", TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ grant_type: "refresh_token", refresh_token: tokens.refreshToken, client_id: creds.clientId, client_secret: creds.clientSecret }),
+      body: form({
+        grant_type: "refresh_token",
+        refresh_token: tokens.refreshToken,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+      }),
     });
-    return { accessToken: next.access_token, refreshToken: next.refresh_token ?? tokens.refreshToken, expiresAt: expiresAt(next.expires_in) };
+    return {
+      accessToken: next.access_token,
+      refreshToken: next.refresh_token ?? tokens.refreshToken,
+      expiresAt: expiresAt(next.expires_in),
+    };
   },
 };

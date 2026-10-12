@@ -39,8 +39,18 @@ export type Platform = {
   /** Env var prefix: `<PREFIX>_CLIENT_ID`, `<PREFIX>_CLIENT_SECRET`. Same names as SocialPostAPI. */
   envPrefix: string;
   pkce: boolean;
-  authorizeUrl(input: { creds: Credentials; redirectUri: string; state: string; challenge: string }): string;
-  exchange(input: { creds: Credentials; code: string; redirectUri: string; verifier: string }): Promise<PlatformLogin>;
+  authorizeUrl(input: {
+    creds: Credentials;
+    redirectUri: string;
+    state: string;
+    challenge: string;
+  }): string;
+  exchange(input: {
+    creds: Credentials;
+    code: string;
+    redirectUri: string;
+    verifier: string;
+  }): Promise<PlatformLogin>;
   /** Renew an account's access token. Absent when the platform cannot refresh. */
   refresh?(input: { creds: Credentials; tokens: StoredTokens }): Promise<RefreshedTokens>;
 };

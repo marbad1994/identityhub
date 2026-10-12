@@ -13,7 +13,8 @@ import {
 } from "@/lib/api";
 import { platformLabel } from "@/lib/platforms";
 import { PlatformIcon } from "@/components/marks";
-import { ErrorNote, Page, useSession } from "@/components/shell";
+import { ErrorNote, Page } from "@/components/shell";
+import { useSession } from "@/lib/session";
 import { PlatformButtons } from "@/components/platform-buttons";
 import type { DeveloperAppView, WorkspaceView } from "@/server/workspace";
 
@@ -51,7 +52,15 @@ function useAction() {
   return { error, run };
 }
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="mt-12">
       <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
@@ -69,19 +78,27 @@ function Workspace() {
   return (
     <Page>
       <div className="flex items-center gap-3">
-          {workspace.user.avatarUrl ? <img src={workspace.user.avatarUrl} alt="" className="size-12 rounded-full" /> : null}
-          <div>
-            <p className="text-sm font-semibold text-muted">Signed in</p>
-            <h1 className="text-3xl font-semibold tracking-tight">{workspace.user.displayName}</h1>
-          </div>
+        {workspace.user.avatarUrl ? (
+          <img src={workspace.user.avatarUrl} alt="" className="size-12 rounded-full" />
+        ) : null}
+        <div>
+          <p className="text-sm font-semibold text-muted">Signed in</p>
+          <h1 className="text-3xl font-semibold tracking-tight">{workspace.user.displayName}</h1>
+        </div>
       </div>
       <ErrorNote message={flowError ?? error} />
 
-      <Section title="Connected accounts" description="Apps can only use the accounts you choose for them.">
+      <Section
+        title="Connected accounts"
+        description="Apps can only use the accounts you choose for them."
+      >
         {workspace.accounts.length === 0 ? <p className="text-muted">No accounts yet.</p> : null}
         <ul className="grid gap-2">
           {workspace.accounts.map((account) => (
-            <li key={account.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
+            <li
+              key={account.id}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3"
+            >
               <div className="flex min-w-0 items-center gap-3">
                 <PlatformIcon id={account.provider} className="size-5 shrink-0" />
                 <div className="min-w-0">
@@ -95,7 +112,8 @@ function Workspace() {
                 type="button"
                 className="inline-flex min-h-11 shrink-0 items-center rounded-full px-3 text-sm font-medium text-danger hover:bg-danger-soft"
                 onClick={() => {
-                  if (confirm(`Disconnect ${account.handle}? Apps lose access to it.`)) void run(() => disconnectAccount({ data: { accountId: account.id } }));
+                  if (confirm(`Disconnect ${account.handle}? Apps lose access to it.`))
+                    void run(() => disconnectAccount({ data: { accountId: account.id } }));
                 }}
               >
                 Disconnect
@@ -104,15 +122,29 @@ function Workspace() {
           ))}
         </ul>
         <div className="mt-5">
-          <PlatformButtons platforms={platforms} intent="connect" returnTo="/workspace" verb="Connect" />
+          <PlatformButtons
+            platforms={platforms}
+            intent="connect"
+            returnTo="/workspace"
+            verb="Connect"
+          />
         </div>
       </Section>
 
-      <Section title="Apps with access" description="Remove an app to revoke every token it holds for you.">
-        <AuthorizedApps workspace={workspace} onRevoke={(appId) => run(() => revokeApp({ data: { appId } }))} />
+      <Section
+        title="Apps with access"
+        description="Remove an app to revoke every token it holds for you."
+      >
+        <AuthorizedApps
+          workspace={workspace}
+          onRevoke={(appId) => run(() => revokeApp({ data: { appId } }))}
+        />
       </Section>
 
-      <Section title="Your apps" description="Register a product to let people sign in with Identity Hub and grant it accounts.">
+      <Section
+        title="Your apps"
+        description="Register a product to let people sign in with Identity Hub and grant it accounts."
+      >
         <DeveloperApps apps={workspace.developerApps} />
       </Section>
 
@@ -122,7 +154,8 @@ function Workspace() {
           {workspace.activity.map((event) => (
             <li key={event.id} className="flex flex-wrap justify-between gap-x-4 py-2 text-sm">
               <span>
-                <span className="font-medium">{event.action}</span> <span className="text-muted">{event.detail}</span>
+                <span className="font-medium">{event.action}</span>{" "}
+                <span className="text-muted">{event.detail}</span>
               </span>
               <time className="text-muted" dateTime={event.at}>
                 {new Date(event.at).toLocaleString()}
@@ -135,22 +168,35 @@ function Workspace() {
   );
 }
 
-function AuthorizedApps({ workspace, onRevoke }: { workspace: WorkspaceView; onRevoke: (appId: string) => void }) {
-  if (workspace.authorizedApps.length === 0) return <p className="text-muted">No app has access yet.</p>;
+function AuthorizedApps({
+  workspace,
+  onRevoke,
+}: {
+  workspace: WorkspaceView;
+  onRevoke: (appId: string) => void;
+}) {
+  if (workspace.authorizedApps.length === 0)
+    return <p className="text-muted">No app has access yet.</p>;
   const accounts = new Map(workspace.accounts.map((account) => [account.id, account]));
   return (
     <ul className="grid gap-3">
       {workspace.authorizedApps.map((app) => (
         <li key={app.appId} className="rounded-2xl border border-line p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <a href={app.homepageUrl} className="font-semibold text-fg no-underline hover:underline" rel="noreferrer" target="_blank">
+            <a
+              href={app.homepageUrl}
+              className="font-semibold text-fg no-underline hover:underline"
+              rel="noreferrer"
+              target="_blank"
+            >
               {app.name}
             </a>
             <button
               type="button"
               className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-danger hover:bg-danger-soft"
               onClick={() => {
-                if (confirm(`Remove ${app.name}'s access to all your accounts?`)) onRevoke(app.appId);
+                if (confirm(`Remove ${app.name}'s access to all your accounts?`))
+                  onRevoke(app.appId);
               }}
             >
               Remove access
@@ -161,7 +207,10 @@ function AuthorizedApps({ workspace, onRevoke }: { workspace: WorkspaceView; onR
               const account = accounts.get(grant.accountId);
               return (
                 <li key={grant.accountId}>
-                  {account ? `${platformLabel(account.provider)} ${account.handle}` : "Removed account"} · {grant.scopes.join(", ")}
+                  {account
+                    ? `${platformLabel(account.provider)} ${account.handle}`
+                    : "Removed account"}{" "}
+                  · {grant.scopes.join(", ")}
                 </li>
               );
             })}
@@ -172,7 +221,15 @@ function AuthorizedApps({ workspace, onRevoke }: { workspace: WorkspaceView; onR
   );
 }
 
-function SecretNotice({ clientId, secret, onDone }: { clientId: string; secret: string; onDone: () => void }) {
+function SecretNotice({
+  clientId,
+  secret,
+  onDone,
+}: {
+  clientId: string;
+  secret: string;
+  onDone: () => void;
+}) {
   return (
     <div className="rounded-2xl border border-ok bg-ok-soft p-4 text-sm">
       <p className="font-semibold">Copy the client secret now. It is not shown again.</p>
@@ -185,20 +242,35 @@ function SecretNotice({ clientId, secret, onDone }: { clientId: string; secret: 
           <dt className="text-muted">client_secret</dt>
           <dd className="flex items-center gap-2 break-all">
             {secret}
-            <button type="button" aria-label="Copy secret" className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-bg" onClick={() => navigator.clipboard.writeText(secret)}>
+            <button
+              type="button"
+              aria-label="Copy secret"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-bg"
+              onClick={() => navigator.clipboard.writeText(secret)}
+            >
               <Copy className="size-4" aria-hidden="true" />
             </button>
           </dd>
         </div>
       </dl>
-      <button type="button" className="mt-3 min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink" onClick={onDone}>
+      <button
+        type="button"
+        className="mt-3 min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink"
+        onClick={onDone}
+      >
         I saved it
       </button>
     </div>
   );
 }
 
-function AppForm({ app, onSaved }: { app?: DeveloperAppView; onSaved: (result: { clientId: string; clientSecret: string } | null) => void }) {
+function AppForm({
+  app,
+  onSaved,
+}: {
+  app?: DeveloperAppView;
+  onSaved: (result: { clientId: string; clientSecret: string } | null) => void;
+}) {
   const { error, run } = useAction();
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -206,7 +278,9 @@ function AppForm({ app, onSaved }: { app?: DeveloperAppView; onSaved: (result: {
     const fields = {
       name: String(form.get("name") ?? ""),
       homepageUrl: String(form.get("homepageUrl") ?? ""),
-      redirectUris: String(form.get("redirectUris") ?? "").split(/\s+/).filter(Boolean),
+      redirectUris: String(form.get("redirectUris") ?? "")
+        .split(/\s+/)
+        .filter(Boolean),
     };
     if (app) {
       const result = await run(() => updateApp({ data: { ...fields, appId: app.id } }));
@@ -221,11 +295,24 @@ function AppForm({ app, onSaved }: { app?: DeveloperAppView; onSaved: (result: {
     <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-line p-4">
       <label className="text-sm font-medium">
         Name
-        <input name="name" required defaultValue={app?.name} className={input} placeholder="SocialPostAPI" />
+        <input
+          name="name"
+          required
+          defaultValue={app?.name}
+          className={input}
+          placeholder="SocialPostAPI"
+        />
       </label>
       <label className="text-sm font-medium">
         Homepage URL
-        <input name="homepageUrl" type="url" required defaultValue={app?.homepageUrl} className={input} placeholder="https://socialpostapi.makketing.com" />
+        <input
+          name="homepageUrl"
+          type="url"
+          required
+          defaultValue={app?.homepageUrl}
+          className={input}
+          placeholder="https://socialpostapi.makketing.com"
+        />
       </label>
       <label className="text-sm font-medium">
         Redirect URIs, one per line
@@ -238,7 +325,10 @@ function AppForm({ app, onSaved }: { app?: DeveloperAppView; onSaved: (result: {
           placeholder="https://socialpostapi.makketing.com/auth/identityhub/callback"
         />
       </label>
-      <button type="submit" className="min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink">
+      <button
+        type="submit"
+        className="min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink"
+      >
         {app ? "Save" : "Register app"}
       </button>
       <ErrorNote message={error} />
@@ -253,7 +343,13 @@ function DeveloperApps({ apps }: { apps: DeveloperAppView[] }) {
   const [creating, setCreating] = useState(false);
   return (
     <div className="grid gap-3">
-      {secret ? <SecretNotice clientId={secret.clientId} secret={secret.clientSecret} onDone={() => setSecret(null)} /> : null}
+      {secret ? (
+        <SecretNotice
+          clientId={secret.clientId}
+          secret={secret.clientSecret}
+          onDone={() => setSecret(null)}
+        />
+      ) : null}
       <ErrorNote message={error} />
       {apps.map((app) =>
         editing === app.id ? (
@@ -263,16 +359,26 @@ function DeveloperApps({ apps }: { apps: DeveloperAppView[] }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">{app.name}</p>
               <div className="flex flex-wrap gap-1">
-                <button type="button" className="min-h-11 rounded-full px-3 text-sm font-medium hover:bg-bg-alt" onClick={() => setEditing(app.id)}>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full px-3 text-sm font-medium hover:bg-bg-alt"
+                  onClick={() => setEditing(app.id)}
+                >
                   Edit
                 </button>
                 <button
                   type="button"
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium hover:bg-bg-alt"
                   onClick={async () => {
-                    if (!confirm(`Rotate ${app.name}'s client secret? The old one stops working immediately.`)) return;
+                    if (
+                      !confirm(
+                        `Rotate ${app.name}'s client secret? The old one stops working immediately.`,
+                      )
+                    )
+                      return;
                     const result = await run(() => rotateAppSecret({ data: { appId: app.id } }));
-                    if (result?.ok) setSecret({ clientId: app.clientId, clientSecret: result.clientSecret });
+                    if (result?.ok)
+                      setSecret({ clientId: app.clientId, clientSecret: result.clientSecret });
                   }}
                 >
                   <KeyRound className="size-4" aria-hidden="true" />
@@ -282,7 +388,12 @@ function DeveloperApps({ apps }: { apps: DeveloperAppView[] }) {
                   type="button"
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-danger hover:bg-danger-soft"
                   onClick={() => {
-                    if (confirm(`Delete ${app.name}? Everyone's grants and tokens for it are removed.`)) void run(() => deleteApp({ data: { appId: app.id } }));
+                    if (
+                      confirm(
+                        `Delete ${app.name}? Everyone's grants and tokens for it are removed.`,
+                      )
+                    )
+                      void run(() => deleteApp({ data: { appId: app.id } }));
                   }}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -311,7 +422,11 @@ function DeveloperApps({ apps }: { apps: DeveloperAppView[] }) {
           }}
         />
       ) : (
-        <button type="button" className="min-h-11 justify-self-start rounded-full bg-bg-alt px-4 text-sm font-semibold" onClick={() => setCreating(true)}>
+        <button
+          type="button"
+          className="min-h-11 justify-self-start rounded-full bg-bg-alt px-4 text-sm font-semibold"
+          onClick={() => setCreating(true)}
+        >
           Register an app
         </button>
       )}

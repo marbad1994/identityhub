@@ -1,6 +1,19 @@
-import { parseScopes, platformInfo, platformLabel, type PlatformId, type ScopeId } from "@/lib/platforms";
+import {
+  parseScopes,
+  platformInfo,
+  platformLabel,
+  type PlatformId,
+  type ScopeId,
+} from "@/lib/platforms";
 import { one, rows, tx } from "./db";
-import { decryptSecret, encryptOptional, encryptSecret, hashesEqual, randomToken, sha256 } from "./crypto";
+import {
+  decryptSecret,
+  encryptOptional,
+  encryptSecret,
+  hashesEqual,
+  randomToken,
+  sha256,
+} from "./crypto";
 import { credentials, platform } from "./platforms";
 import { logActivity } from "./activity";
 import { listAccounts, type AccountView, type Result } from "./workspace";
@@ -9,17 +22,31 @@ const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-type AppRow = { id: string; name: string; homepage_url: string; redirect_uris: string[]; client_secret_hash: string };
+type AppRow = {
+  id: string;
+  name: string;
+  homepage_url: string;
+  redirect_uris: string[];
+  client_secret_hash: string;
+};
 
 async function appByClientId(clientId: string): Promise<AppRow | undefined> {
-  return one<AppRow>(`select id, name, homepage_url, redirect_uris, client_secret_hash from apps where client_id = $1`, [clientId]);
+  return one<AppRow>(
+    `select id, name, homepage_url, redirect_uris, client_secret_hash from apps where client_id = $1`,
+    [clientId],
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Consent (browser, signed in)
 // ---------------------------------------------------------------------------
 
-export type AuthorizeRequest = { clientId: string; redirectUri: string; state?: string; scope?: string };
+export type AuthorizeRequest = {
+  clientId: string;
+  redirectUri: string;
+  state?: string;
+  scope?: string;
+};
 
 export type ConsentView = {
   app: { name: string; homepageUrl: string };
@@ -28,19 +55,27 @@ export type ConsentView = {
 };
 
 /** Validate an authorization request. Errors here must not redirect: the redirect URI is not trusted yet. */
-export async function consentView(userId: string | null, request: AuthorizeRequest): Promise<Result<{ view: ConsentView | null; app: { name: string; homepageUrl: string } }>> {
+export async function consentView(
+  userId: string | null,
+  request: AuthorizeRequest,
+): Promise<Result<{ view: ConsentView | null; app: { name: string; homepageUrl: string } }>> {
   const app = await appByClientId(request.clientId);
   if (!app) return { ok: false, error: "Unknown client_id." };
-  if (!app.redirect_uris.includes(request.redirectUri)) return { ok: false, error: "redirect_uri is not registered for this app." };
+  if (!app.redirect_uris.includes(request.redirectUri))
+    return { ok: false, error: "redirect_uri is not registered for this app." };
   const scopes = parseScopes(request.scope || "profile");
-  if (scopes.length === 0) return { ok: false, error: "scope must include profile and/or publish." };
+  if (scopes.length === 0)
+    return { ok: false, error: "scope must include profile and/or publish." };
   const summary = { name: app.name, homepageUrl: app.homepage_url };
   if (!userId) return { ok: true, view: null, app: summary };
 
   const granted = new Set(
-    (await rows<{ account_id: string }>(`select account_id from app_grants where user_id = $1 and app_id = $2`, [userId, app.id])).map(
-      (row) => row.account_id,
-    ),
+    (
+      await rows<{ account_id: string }>(
+        `select account_id from app_grants where user_id = $1 and app_id = $2`,
+        [userId, app.id],
+      )
+    ).map((row) => row.account_id),
   );
   const accounts = (await listAccounts(userId)).map((account) => ({
     ...account,
@@ -52,22 +87,32 @@ export async function consentView(userId: string | null, request: AuthorizeReque
 
 function redirectWith(redirectUri: string, params: Record<string, string | undefined>): string {
   const url = new URL(redirectUri);
-  for (const [key, value] of Object.entries(params)) if (value !== undefined) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(params))
+    if (value !== undefined) url.searchParams.set(key, value);
   return url.toString();
 }
 
 /** The person allowed the app: store the grants and hand the app a one-time code. */
-export async function approve(userId: string, request: AuthorizeRequest & { accountIds: string[] }): Promise<Result<{ redirect: string }>> {
+export async function approve(
+  userId: string,
+  request: AuthorizeRequest & { accountIds: string[] },
+): Promise<Result<{ redirect: string }>> {
   const checked = await consentView(userId, request);
   if (!checked.ok) return checked;
   const view = checked.view!;
   const app = (await appByClientId(request.clientId))!;
-  const chosen = view.accounts.filter((account) => request.accountIds.includes(account.id) && account.grantable.length > 0);
+  const chosen = view.accounts.filter(
+    (account) => request.accountIds.includes(account.id) && account.grantable.length > 0,
+  );
   if (chosen.length === 0) return { ok: false, error: "Choose at least one account to share." };
 
   const code = randomToken("code_");
   await tx(async (client) => {
-    await rows(`delete from app_grants where user_id = $1 and app_id = $2`, [userId, app.id], client);
+    await rows(
+      `delete from app_grants where user_id = $1 and app_id = $2`,
+      [userId, app.id],
+      client,
+    );
     for (const account of chosen) {
       await rows(
         `insert into app_grants (user_id, app_id, account_id, scopes) values ($1, $2, $3, $4)`,
@@ -92,7 +137,10 @@ export async function approve(userId: string, request: AuthorizeRequest & { acco
 export async function deny(request: AuthorizeRequest): Promise<Result<{ redirect: string }>> {
   const checked = await consentView(null, request);
   if (!checked.ok) return checked;
-  return { ok: true, redirect: redirectWith(request.redirectUri, { error: "access_denied", state: request.state }) };
+  return {
+    ok: true,
+    redirect: redirectWith(request.redirectUri, { error: "access_denied", state: request.state }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +179,9 @@ export async function readBody(request: Request): Promise<Record<string, string>
   const type = request.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
     const json = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    return Object.fromEntries(Object.entries(json ?? {}).map(([key, value]) => [key, String(value ?? "")]));
+    return Object.fromEntries(
+      Object.entries(json ?? {}).map(([key, value]) => [key, String(value ?? "")]),
+    );
   }
   return Object.fromEntries(new URLSearchParams(await request.text()));
 }
@@ -165,7 +215,9 @@ async function grantedAccounts(userId: string, appId: string) {
 }
 
 async function identityPayload(userId: string, appId: string) {
-  const user = (await one<UserRow>(`select id, display_name, avatar_url from users where id = $1`, [userId]))!;
+  const user = (await one<UserRow>(`select id, display_name, avatar_url from users where id = $1`, [
+    userId,
+  ]))!;
   return {
     user: { id: user.id, display_name: user.display_name, avatar_url: user.avatar_url },
     accounts: await grantedAccounts(userId, appId),
@@ -185,11 +237,23 @@ export async function exchangeCode(request: Request) {
     [sha256(body.code ?? ""), app.id],
   );
   if (!used || used.expires_at.getTime() < Date.now() || used.redirect_uri !== body.redirect_uri) {
-    throw new ApiError(400, "invalid_grant", "The code is unknown, used, expired, or redirect_uri does not match.");
+    throw new ApiError(
+      400,
+      "invalid_grant",
+      "The code is unknown, used, expired, or redirect_uri does not match.",
+    );
   }
   const token = randomToken("ihub_at_");
-  await rows(`insert into app_tokens (token_hash, user_id, app_id) values ($1, $2, $3)`, [sha256(token), used.user_id, app.id]);
-  return { access_token: token, token_type: "Bearer", ...(await identityPayload(used.user_id, app.id)) };
+  await rows(`insert into app_tokens (token_hash, user_id, app_id) values ($1, $2, $3)`, [
+    sha256(token),
+    used.user_id,
+    app.id,
+  ]);
+  return {
+    access_token: token,
+    token_type: "Bearer",
+    ...(await identityPayload(used.user_id, app.id)),
+  };
 }
 
 /** Resolve the `Authorization: Bearer ihub_at_...` header to the user and app it belongs to. */
@@ -236,28 +300,50 @@ export async function accountToken(request: Request, accountId: string) {
     );
     if (!row) throw new ApiError(404, "not_found", "That account is not granted to this app.");
     if (!parseScopes(row.scopes).includes("publish")) {
-      throw new ApiError(403, "insufficient_scope", "The person did not grant publish access to this account.");
+      throw new ApiError(
+        403,
+        "insufficient_scope",
+        "The person did not grant publish access to this account.",
+      );
     }
     let accessToken = decryptSecret(row.access_token);
     let expiresAt = row.token_expires_at;
     if (expiresAt && expiresAt.getTime() - Date.now() < REFRESH_MARGIN_MS) {
       const p = platform(row.provider);
       const creds = p ? credentials(p) : null;
-      if (!p?.refresh || !creds) throw new ApiError(409, "reconnect_required", "The token expired and cannot be refreshed. Ask the person to reconnect.");
+      if (!p?.refresh || !creds)
+        throw new ApiError(
+          409,
+          "reconnect_required",
+          "The token expired and cannot be refreshed. Ask the person to reconnect.",
+        );
       try {
         const next = await p.refresh({
           creds,
-          tokens: { accountId: row.account_id, accessToken, refreshToken: row.refresh_token ? decryptSecret(row.refresh_token) : null },
+          tokens: {
+            accountId: row.account_id,
+            accessToken,
+            refreshToken: row.refresh_token ? decryptSecret(row.refresh_token) : null,
+          },
         });
         accessToken = next.accessToken;
         expiresAt = next.expiresAt;
         await rows(
           `update accounts set access_token = $2, refresh_token = coalesce($3, refresh_token), token_expires_at = $4 where id = $1`,
-          [accountId, encryptSecret(next.accessToken), encryptOptional(next.refreshToken), next.expiresAt],
+          [
+            accountId,
+            encryptSecret(next.accessToken),
+            encryptOptional(next.refreshToken),
+            next.expiresAt,
+          ],
           client,
         );
       } catch (error) {
-        throw new ApiError(409, "reconnect_required", error instanceof Error ? error.message : "Refresh failed; reconnect the account.");
+        throw new ApiError(
+          409,
+          "reconnect_required",
+          error instanceof Error ? error.message : "Refresh failed; reconnect the account.",
+        );
       }
     }
     return {
@@ -273,6 +359,9 @@ export async function accountToken(request: Request, accountId: string) {
 export async function revokeToken(request: Request) {
   const body = await readBody(request);
   const app = await authenticateClient(request, body);
-  await rows(`delete from app_tokens where token_hash = $1 and app_id = $2`, [sha256(body.token ?? ""), app.id]);
+  await rows(`delete from app_tokens where token_hash = $1 and app_id = $2`, [
+    sha256(body.token ?? ""),
+    app.id,
+  ]);
   return {};
 }

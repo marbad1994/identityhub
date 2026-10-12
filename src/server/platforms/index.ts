@@ -10,7 +10,16 @@ import { twitter } from "./twitter";
 import type { Credentials, Platform } from "./types";
 import { youtube } from "./youtube";
 
-const REGISTRY: Record<PlatformId, Platform> = { twitter, instagram, facebook, tiktok, linkedin, youtube, reddit, snapchat };
+const REGISTRY: Record<PlatformId, Platform> = {
+  twitter,
+  instagram,
+  facebook,
+  tiktok,
+  linkedin,
+  youtube,
+  reddit,
+  snapchat,
+};
 
 export function platform(id: string): Platform | undefined {
   return Object.hasOwn(REGISTRY, id) ? REGISTRY[id as PlatformId] : undefined;

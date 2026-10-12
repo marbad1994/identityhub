@@ -9,7 +9,10 @@ function pool(): pg.Pool {
 }
 
 export type Queryable = {
-  query<T extends pg.QueryResultRow = Record<string, unknown>>(text: string, params?: unknown[]): Promise<pg.QueryResult<T>>;
+  query<T extends pg.QueryResultRow = Record<string, unknown>>(
+    text: string,
+    params?: unknown[],
+  ): Promise<pg.QueryResult<T>>;
 };
 
 /** Run one parameterized statement and return its rows. */

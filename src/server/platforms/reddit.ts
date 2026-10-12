@@ -34,7 +34,8 @@ export const reddit: Platform = {
     });
     const id = String(user.id);
     const name = user.name ?? id;
-    const avatar = typeof user.icon_img === "string" && user.icon_img ? user.icon_img.split("?")[0] : null;
+    const avatar =
+      typeof user.icon_img === "string" && user.icon_img ? user.icon_img.split("?")[0] : null;
     return {
       subject: { id, displayName: name, avatarUrl: avatar },
       accounts: [

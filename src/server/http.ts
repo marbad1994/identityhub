@@ -12,9 +12,15 @@ export async function apiResponse(work: () => Promise<unknown>): Promise<Respons
     return Response.json(await work(), { headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof ApiError) {
-      return Response.json({ error: error.code, error_description: error.message }, { status: error.status, headers: { "cache-control": "no-store" } });
+      return Response.json(
+        { error: error.code, error_description: error.message },
+        { status: error.status, headers: { "cache-control": "no-store" } },
+      );
     }
     console.error("[api]", error);
-    return Response.json({ error: "server_error", error_description: "Unexpected error." }, { status: 500 });
+    return Response.json(
+      { error: "server_error", error_description: "Unexpected error." },
+      { status: 500 },
+    );
   }
 }

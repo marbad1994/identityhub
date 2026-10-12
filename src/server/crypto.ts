@@ -1,4 +1,11 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import { env } from "./env";
 
 export function uid(): string {
@@ -44,7 +51,10 @@ export function decryptSecret(payload: string): string {
   if (!iv || !tag || !body) throw new Error("Stored token is unreadable");
   const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(iv, "base64url"));
   decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]).toString("utf8");
+  return Buffer.concat([
+    decipher.update(Buffer.from(body, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 export function encryptOptional(plain: string | null | undefined): string | null {

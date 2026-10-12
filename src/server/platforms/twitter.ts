@@ -27,12 +27,24 @@ export const twitter: Platform = {
     const tokens = await requestJson("X", TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: creds.clientId, code_verifier: verifier }),
+      body: form({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: creds.clientId,
+        code_verifier: verifier,
+      }),
     });
-    const me = await requestJson("X", withQuery(ME_URL, { "user.fields": "profile_image_url" }), { headers: bearer(tokens.access_token) });
+    const me = await requestJson("X", withQuery(ME_URL, { "user.fields": "profile_image_url" }), {
+      headers: bearer(tokens.access_token),
+    });
     const user = me.data ?? {};
     const id = String(user.id);
-    const subject = { id, displayName: user.name ?? user.username ?? id, avatarUrl: user.profile_image_url ?? null };
+    const subject = {
+      id,
+      displayName: user.name ?? user.username ?? id,
+      avatarUrl: user.profile_image_url ?? null,
+    };
     return {
       subject,
       accounts: [
@@ -50,12 +62,21 @@ export const twitter: Platform = {
     };
   },
   async refresh({ creds, tokens }) {
-    if (!tokens.refreshToken) throw new Error("X did not issue a refresh token; reconnect the account");
+    if (!tokens.refreshToken)
+      throw new Error("X did not issue a refresh token; reconnect the account");
     const next = await requestJson("X", TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ grant_type: "refresh_token", refresh_token: tokens.refreshToken, client_id: creds.clientId }),
+      body: form({
+        grant_type: "refresh_token",
+        refresh_token: tokens.refreshToken,
+        client_id: creds.clientId,
+      }),
     });
-    return { accessToken: next.access_token, refreshToken: next.refresh_token ?? tokens.refreshToken, expiresAt: expiresAt(next.expires_in) };
+    return {
+      accessToken: next.access_token,
+      refreshToken: next.refresh_token ?? tokens.refreshToken,
+      expiresAt: expiresAt(next.expires_in),
+    };
   },
 };

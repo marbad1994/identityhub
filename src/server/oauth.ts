@@ -12,7 +12,8 @@ const STATE_MINUTES = 10;
 
 /** Only same-site relative paths may be returned to after a platform round trip. */
 export function safeReturnTo(value: string | null | undefined, fallback: string): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\"))
+    return fallback;
   return value;
 }
 
@@ -35,7 +36,10 @@ export async function beginAuthorization(input: {
   const fallback = input.intent === "connect" ? "/workspace" : "/login";
   if (!p) return { location: withError(fallback, "That platform is not supported.") };
   const creds = credentials(p);
-  if (!creds) return { location: withError(fallback, `${platformLabel(p.id)} is not configured on this hub yet.`) };
+  if (!creds)
+    return {
+      location: withError(fallback, `${platformLabel(p.id)} is not configured on this hub yet.`),
+    };
   if (input.intent === "connect" && !input.user) return { location: "/login" };
 
   const { verifier, challenge } = pkcePair();
@@ -49,7 +53,12 @@ export async function beginAuthorization(input: {
   return { location: p.authorizeUrl({ creds, redirectUri: callbackUrl(p.id), state, challenge }) };
 }
 
-async function upsertAccounts(client: pg.PoolClient, userId: string, provider: string, login: PlatformLogin) {
+async function upsertAccounts(
+  client: pg.PoolClient,
+  userId: string,
+  provider: string,
+  login: PlatformLogin,
+) {
   for (const account of login.accounts) {
     await rows(
       `insert into accounts (id, user_id, provider, account_id, handle, display_name, avatar_url,
@@ -83,27 +92,35 @@ async function upsertAccounts(client: pg.PoolClient, userId: string, provider: s
 }
 
 /** Resolve the hub user for a platform identity, creating one on first sign-in. */
-async function userForLogin(client: pg.PoolClient, provider: string, login: PlatformLogin): Promise<string> {
+async function userForLogin(
+  client: pg.PoolClient,
+  provider: string,
+  login: PlatformLogin,
+): Promise<string> {
   const existing = await one<{ user_id: string }>(
     `select user_id from user_logins where provider = $1 and subject = $2`,
     [provider, login.subject.id],
     client,
   );
   if (existing) {
-    await rows(`update users set display_name = $2, avatar_url = coalesce($3, avatar_url) where id = $1`, [
-      existing.user_id,
-      login.subject.displayName.slice(0, 120),
-      login.subject.avatarUrl,
-    ], client);
+    await rows(
+      `update users set display_name = $2, avatar_url = coalesce($3, avatar_url) where id = $1`,
+      [existing.user_id, login.subject.displayName.slice(0, 120), login.subject.avatarUrl],
+      client,
+    );
     return existing.user_id;
   }
   const userId = uid();
-  await rows(`insert into users (id, display_name, avatar_url) values ($1, $2, $3)`, [
-    userId,
-    login.subject.displayName.slice(0, 120),
-    login.subject.avatarUrl,
-  ], client);
-  await rows(`insert into user_logins (provider, subject, user_id) values ($1, $2, $3)`, [provider, login.subject.id, userId], client);
+  await rows(
+    `insert into users (id, display_name, avatar_url) values ($1, $2, $3)`,
+    [userId, login.subject.displayName.slice(0, 120), login.subject.avatarUrl],
+    client,
+  );
+  await rows(
+    `insert into user_logins (provider, subject, user_id) values ($1, $2, $3)`,
+    [provider, login.subject.id, userId],
+    client,
+  );
   return userId;
 }
 
@@ -111,32 +128,62 @@ async function userForLogin(client: pg.PoolClient, provider: string, login: Plat
 export async function finishAuthorization(provider: string, requestUrl: string): Promise<Redirect> {
   const url = new URL(requestUrl);
   const state = url.searchParams.get("state") ?? "";
-  const pending = await one<{ intent: "login" | "connect"; user_id: string | null; provider: string; verifier: string; return_to: string }>(
+  const pending = await one<{
+    intent: "login" | "connect";
+    user_id: string | null;
+    provider: string;
+    verifier: string;
+    return_to: string;
+  }>(
     `delete from oauth_states where state = $1 and expires_at > now() returning intent, user_id, provider, verifier, return_to`,
     [state],
   );
   if (!pending || pending.provider !== provider) {
-    return { location: withError("/login", "That sign-in attempt expired or was already used. Start again.") };
+    return {
+      location: withError(
+        "/login",
+        "That sign-in attempt expired or was already used. Start again.",
+      ),
+    };
   }
   const fallback = pending.intent === "connect" ? "/workspace" : "/login";
   const p = platform(provider);
   const creds = p ? credentials(p) : null;
-  if (!p || !creds) return { location: withError(fallback, "This platform is no longer configured.") };
+  if (!p || !creds)
+    return { location: withError(fallback, "This platform is no longer configured.") };
 
   const code = url.searchParams.get("code");
   if (!code) {
-    const reason = url.searchParams.get("error_description") ?? url.searchParams.get("error") ?? "The platform did not return a code.";
+    const reason =
+      url.searchParams.get("error_description") ??
+      url.searchParams.get("error") ??
+      "The platform did not return a code.";
     return { location: withError(fallback, reason) };
   }
 
   let login: PlatformLogin;
   try {
-    login = await p.exchange({ creds, code, redirectUri: callbackUrl(p.id), verifier: pending.verifier });
+    login = await p.exchange({
+      creds,
+      code,
+      redirectUri: callbackUrl(p.id),
+      verifier: pending.verifier,
+    });
   } catch (error) {
-    return { location: withError(fallback, error instanceof Error ? error.message : "The platform rejected the sign-in.") };
+    return {
+      location: withError(
+        fallback,
+        error instanceof Error ? error.message : "The platform rejected the sign-in.",
+      ),
+    };
   }
   if (pending.intent === "connect" && login.accounts.length === 0) {
-    return { location: withError(fallback, `No ${platformLabel(p.id)} accounts were shared. Facebook needs at least one Page you manage.`) };
+    return {
+      location: withError(
+        fallback,
+        `No ${platformLabel(p.id)} accounts were shared. Facebook needs at least one Page you manage.`,
+      ),
+    };
   }
 
   const label = platformLabel(p.id);
@@ -149,7 +196,12 @@ export async function finishAuthorization(provider: string, requestUrl: string):
         [p.id, login.subject.id, pending.user_id],
         client,
       );
-      await logActivity(pending.user_id, "Connected", `${login.accounts.length} ${label} account(s): ${login.accounts.map((a) => a.handle).join(", ")}`, client);
+      await logActivity(
+        pending.user_id,
+        "Connected",
+        `${login.accounts.length} ${label} account(s): ${login.accounts.map((a) => a.handle).join(", ")}`,
+        client,
+      );
       return { location: safeReturnTo(pending.return_to, "/workspace") };
     }
     const userId = await userForLogin(client, p.id, login);

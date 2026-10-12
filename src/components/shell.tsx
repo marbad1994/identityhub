@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
-import { Link, useLoaderData } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
+import { useSession } from "@/lib/session";
 import { LogOut } from "lucide-react";
 import { Mark } from "./marks";
-
-export function useSession() {
-  return useLoaderData({ from: "__root__" });
-}
 
 function SignOutButton() {
   return (
     <form method="post" action="/api/auth/logout">
-      <button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-muted hover:text-fg">
+      <button
+        type="submit"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-muted hover:text-fg"
+      >
         <LogOut className="size-4" aria-hidden="true" />
         <span className="sr-only sm:not-sr-only">Sign out</span>
       </button>
@@ -30,7 +30,10 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1">
-          <Link to="/docs" className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg">
+          <Link
+            to="/docs"
+            className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg"
+          >
             Docs
           </Link>
           {user ? (
@@ -63,11 +66,21 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <p className="text-sm text-muted">Identity Hub, part of the Makketing suite.</p>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-          <Link to="/docs" className="text-muted no-underline hover:text-fg">Docs</Link>
-          <Link to="/privacy" className="text-muted no-underline hover:text-fg">Privacy Policy</Link>
-          <Link to="/terms" className="text-muted no-underline hover:text-fg">Terms of Service</Link>
-          <Link to="/deletion" className="text-muted no-underline hover:text-fg">Data Deletion</Link>
-          <a href="mailto:support@makketing.com" className="text-link no-underline hover:underline">support@makketing.com</a>
+          <Link to="/docs" className="text-muted no-underline hover:text-fg">
+            Docs
+          </Link>
+          <Link to="/privacy" className="text-muted no-underline hover:text-fg">
+            Privacy Policy
+          </Link>
+          <Link to="/terms" className="text-muted no-underline hover:text-fg">
+            Terms of Service
+          </Link>
+          <Link to="/deletion" className="text-muted no-underline hover:text-fg">
+            Data Deletion
+          </Link>
+          <a href="mailto:support@makketing.com" className="text-link no-underline hover:underline">
+            support@makketing.com
+          </a>
         </div>
       </div>
     </footer>

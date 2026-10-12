@@ -5,7 +5,11 @@ export class PlatformError extends Error {}
 type Json = Record<string, any>;
 
 /** Fetch and parse JSON, turning a platform error body into a readable message. Never logs bodies: they carry tokens. */
-export async function requestJson(platform: string, url: string, init: RequestInit = {}): Promise<Json> {
+export async function requestJson(
+  platform: string,
+  url: string,
+  init: RequestInit = {},
+): Promise<Json> {
   const response = await fetch(url, init);
   const text = await response.text();
   let body: Json = {};
@@ -16,7 +20,13 @@ export async function requestJson(platform: string, url: string, init: RequestIn
   }
   if (!response.ok) {
     const nested = typeof body.error === "object" && body.error ? body.error.message : undefined;
-    const message = body.error_description ?? body.message ?? nested ?? body.error ?? body.raw ?? `HTTP ${response.status}`;
+    const message =
+      body.error_description ??
+      body.message ??
+      nested ??
+      body.error ??
+      body.raw ??
+      `HTTP ${response.status}`;
     throw new PlatformError(`${platform} rejected the request: ${String(message)}`);
   }
   return body;
@@ -41,6 +51,7 @@ export function expiresAt(expiresIn: unknown): Date | null {
 
 export function withQuery(base: string, params: Record<string, string | undefined>): string {
   const url = new URL(base);
-  for (const [key, value] of Object.entries(params)) if (value !== undefined) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(params))
+    if (value !== undefined) url.searchParams.set(key, value);
   return url.toString();
 }

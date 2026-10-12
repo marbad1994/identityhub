@@ -5,7 +5,13 @@ import type { Platform } from "./types";
 const AUTHORIZE_URL = "https://www.facebook.com/v21.0/dialog/oauth";
 const TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token";
 const API = "https://graph.facebook.com/v21.0";
-const SCOPES = ["public_profile", "pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_metadata"];
+const SCOPES = [
+  "public_profile",
+  "pages_show_list",
+  "pages_read_engagement",
+  "pages_manage_posts",
+  "pages_manage_metadata",
+];
 
 /**
  * Signing in identifies the Facebook user; the accounts it unlocks are the
@@ -32,7 +38,12 @@ export const facebook: Platform = {
   async exchange({ creds, code, redirectUri }) {
     const short = await requestJson(
       "Facebook",
-      withQuery(TOKEN_URL, { client_id: creds.clientId, client_secret: creds.clientSecret, redirect_uri: redirectUri, code }),
+      withQuery(TOKEN_URL, {
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+        redirect_uri: redirectUri,
+        code,
+      }),
     );
     const long = await requestJson(
       "Facebook",
@@ -44,13 +55,23 @@ export const facebook: Platform = {
       }),
     );
     const userToken: string = long.access_token;
-    const me = await requestJson("Facebook", withQuery(`${API}/me`, { fields: "id,name,picture", access_token: userToken }));
+    const me = await requestJson(
+      "Facebook",
+      withQuery(`${API}/me`, { fields: "id,name,picture", access_token: userToken }),
+    );
     const pages = await requestJson(
       "Facebook",
-      withQuery(`${API}/me/accounts`, { fields: "id,name,access_token,picture", access_token: userToken }),
+      withQuery(`${API}/me/accounts`, {
+        fields: "id,name,access_token,picture",
+        access_token: userToken,
+      }),
     );
     return {
-      subject: { id: String(me.id), displayName: me.name ?? String(me.id), avatarUrl: me.picture?.data?.url ?? null },
+      subject: {
+        id: String(me.id),
+        displayName: me.name ?? String(me.id),
+        avatarUrl: me.picture?.data?.url ?? null,
+      },
       accounts: ((pages.data ?? []) as any[]).map((page) => ({
         accountId: String(page.id),
         handle: page.name ?? String(page.id),
@@ -69,7 +90,10 @@ export const facebook: Platform = {
     if (!tokens.refreshToken) throw new Error("Reconnect the Facebook Page");
     const pages = await requestJson(
       "Facebook",
-      withQuery(`${API}/me/accounts`, { fields: "id,access_token", access_token: tokens.refreshToken }),
+      withQuery(`${API}/me/accounts`, {
+        fields: "id,access_token",
+        access_token: tokens.refreshToken,
+      }),
     );
     const page = ((pages.data ?? []) as any[]).find((item) => String(item.id) === tokens.accountId);
     if (!page) throw new Error("The Page is no longer accessible; reconnect Facebook");

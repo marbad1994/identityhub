@@ -10,7 +10,8 @@ export const Route = createRootRoute({
       { title: "Identity Hub" },
       {
         name: "description",
-        content: "Sign in with any supported social platform, then choose which connected accounts each Makketing app may use.",
+        content:
+          "Sign in with any supported social platform, then choose which connected accounts each Makketing app may use.",
       },
       { name: "theme-color", content: "#111111" },
     ],
@@ -18,7 +19,10 @@ export const Route = createRootRoute({
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+      },
       { rel: "stylesheet", href: appCss },
     ],
   }),

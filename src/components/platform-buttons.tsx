@@ -13,7 +13,12 @@ export function PlatformButtons({
   verb: string;
 }) {
   if (platforms.length === 0) {
-    return <p className="text-sm text-muted">No platform is configured on this hub yet. The host sets each platform's client id and secret.</p>;
+    return (
+      <p className="text-sm text-muted">
+        No platform is configured on this hub yet. The host sets each platform's client id and
+        secret.
+      </p>
+    );
   }
   return (
     <div className="grid gap-2 sm:grid-cols-2">

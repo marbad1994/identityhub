@@ -4,7 +4,10 @@ import type { Platform } from "./types";
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels";
-const SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/youtube.upload",
+  "https://www.googleapis.com/auth/youtube.readonly",
+];
 
 export const youtube: Platform = {
   id: "youtube",
@@ -37,9 +40,13 @@ export const youtube: Platform = {
         code_verifier: verifier,
       }),
     });
-    const channels = await requestJson("YouTube", withQuery(CHANNELS_URL, { part: "snippet", mine: "true" }), {
-      headers: bearer(tokens.access_token),
-    });
+    const channels = await requestJson(
+      "YouTube",
+      withQuery(CHANNELS_URL, { part: "snippet", mine: "true" }),
+      {
+        headers: bearer(tokens.access_token),
+      },
+    );
     const channel = channels.items?.[0];
     if (!channel) throw new PlatformError("This Google account has no YouTube channel");
     const title = channel.snippet?.title ?? String(channel.id);
@@ -65,7 +72,12 @@ export const youtube: Platform = {
     const next = await requestJson("YouTube", TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ grant_type: "refresh_token", refresh_token: tokens.refreshToken, client_id: creds.clientId, client_secret: creds.clientSecret }),
+      body: form({
+        grant_type: "refresh_token",
+        refresh_token: tokens.refreshToken,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+      }),
     });
     return { accessToken: next.access_token, expiresAt: expiresAt(next.expires_in) };
   },

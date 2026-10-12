@@ -9,7 +9,9 @@ const SCOPES = ["user.info.basic", "video.publish", "video.upload"];
 // TikTok calls the client id `client_key`, and can answer 200 with an error body.
 function assertOk(tokens: Record<string, any>) {
   if (tokens.error && tokens.error !== "ok") {
-    throw new PlatformError(`TikTok rejected the request: ${tokens.error_description ?? tokens.error}`);
+    throw new PlatformError(
+      `TikTok rejected the request: ${tokens.error_description ?? tokens.error}`,
+    );
   }
 }
 
@@ -41,9 +43,13 @@ export const tiktok: Platform = {
       }),
     });
     assertOk(tokens);
-    const me = await requestJson("TikTok", withQuery(ME_URL, { fields: "open_id,display_name,avatar_url" }), {
-      headers: bearer(tokens.access_token),
-    });
+    const me = await requestJson(
+      "TikTok",
+      withQuery(ME_URL, { fields: "open_id,display_name,avatar_url" }),
+      {
+        headers: bearer(tokens.access_token),
+      },
+    );
     const user = me.data?.user ?? {};
     const id = String(user.open_id ?? tokens.open_id);
     const name = user.display_name ?? id;
@@ -76,6 +82,10 @@ export const tiktok: Platform = {
       }),
     });
     assertOk(next);
-    return { accessToken: next.access_token, refreshToken: next.refresh_token ?? tokens.refreshToken, expiresAt: expiresAt(next.expires_in) };
+    return {
+      accessToken: next.access_token,
+      refreshToken: next.refresh_token ?? tokens.refreshToken,
+      expiresAt: expiresAt(next.expires_in),
+    };
   },
 };

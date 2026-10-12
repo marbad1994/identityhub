@@ -35,11 +35,20 @@ export const snapchat: Platform = {
         authorization: basicAuth(creds.clientId, creds.clientSecret),
         "content-type": "application/x-www-form-urlencoded",
       },
-      body: form({ grant_type: "authorization_code", code, redirect_uri: redirectUri, code_verifier: verifier }),
+      body: form({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+      }),
     });
-    const me = await requestJson("Snapchat", withQuery(ME_URL, { query: "{me{externalId displayName bitmoji{avatar}}}" }), {
-      headers: bearer(tokens.access_token),
-    });
+    const me = await requestJson(
+      "Snapchat",
+      withQuery(ME_URL, { query: "{me{externalId displayName bitmoji{avatar}}}" }),
+      {
+        headers: bearer(tokens.access_token),
+      },
+    );
     const user = me.data?.me ?? {};
     const id = String(user.externalId);
     const name = user.displayName ?? "Snapchat user";
