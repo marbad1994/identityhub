@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { SIGN_IN_PROVIDERS, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { SiteFooter, SiteHeader } from "@/components/shell";
 import { WorkspaceView } from "@/components/workspace-view";
@@ -23,7 +23,7 @@ function WorkspacePage() {
             <h1 className="text-3xl font-semibold tracking-tight">Sign in to the workspace</h1>
             <p className="mt-2 text-sm text-muted">Connections and grants belong to the signed-in owner.</p>
             <div className="mt-6 grid gap-2">
-              {GROK_PROVIDERS.map((provider) => (
+              {SIGN_IN_PROVIDERS.map((provider) => (
                 <button
                   key={provider.providerId}
                   type="button"

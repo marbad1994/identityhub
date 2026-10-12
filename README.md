@@ -2,7 +2,7 @@
 
 One identity for the Makketing suite. Visually aligned with [SocialPostAPI](https://socialpostapi.makketing.com).
 
-Sign in with Google or X, connect sandbox profiles immediately, and turn on live platform OAuth once the host has keys. Product servers exchange a one-time code for a hub token. Platform tokens stay encrypted on the hub.
+Sign in directly with X, Instagram, Facebook, TikTok, LinkedIn, YouTube, or Reddit, connect sandbox profiles immediately, and turn on live platform OAuth once the host has keys. Product servers exchange a one-time code for a hub token. Platform tokens stay encrypted on the hub.
 
 ## Run
 
@@ -64,10 +64,13 @@ Set these on the host. Do not commit them.
 
 YouTube uses its own client pair so it does not collide with Google sign-in.
 
-Register this callback on every platform:
+Sign-in uses the same client credentials, directly with each platform (no external auth broker). Set `BETTER_AUTH_URL` (same value as `APP_ORIGIN`) and `BETTER_AUTH_SECRET` (random string). A platform shows up for sign-in once its client id and secret are set.
+
+Register these callbacks on every platform, the second for sign-in and the first for connecting profiles:
 
 ```text
 {APP_ORIGIN}/api/oauth/callback
+{APP_ORIGIN}/api/auth/oauth2/callback/{x|instagram|facebook|tiktok|linkedin|youtube|reddit}
 ```
 
 Point the Stripe webhook at:

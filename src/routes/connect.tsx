@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { approveConnect, fetchConnectionsForConsent, lookupProduct } from "@/lib/broker/api";
 import { PROVIDERS, SCOPE_LABEL, type ScopeId } from "@/lib/hub";
-import { GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { SIGN_IN_PROVIDERS, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { SiteFooter, SiteHeader } from "@/components/shell";
 
@@ -64,7 +64,7 @@ function Connect() {
         {isPending ? <p className="mt-6 text-muted">Checking session…</p> : null}
         {!isPending && !user ? (
           <div className="mt-6 grid gap-2">
-            {GROK_PROVIDERS.map((provider) => (
+            {SIGN_IN_PROVIDERS.map((provider) => (
               <button
                 key={provider.providerId}
                 type="button"
