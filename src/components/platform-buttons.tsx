@@ -12,14 +12,9 @@ export function PlatformButtons({
   returnTo: string;
   verb: string;
 }) {
-  if (platforms.length === 0) {
-    return (
-      <p className="text-sm text-muted">
-        No platform is configured on this hub yet. The host sets each platform's client id and
-        secret.
-      </p>
-    );
-  }
+  // Email and password is a form, not a redirect; callers render it separately.
+  platforms = platforms.filter((platform) => platform.id !== "password");
+  if (platforms.length === 0) return null;
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {platforms.map((platform) => (

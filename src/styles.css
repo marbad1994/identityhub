@@ -1,7 +1,9 @@
 @import "tailwindcss";
+/* Self-hosted: no request to a third-party font CDN (privacy, CSP). */
+@import "@fontsource-variable/inter";
 
 @theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --color-bg: #ffffff;
   --color-bg-alt: #f5f5f7;
   --color-fg: #111111;

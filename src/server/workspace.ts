@@ -1,5 +1,4 @@
 import {
-  PLATFORMS,
   parseScopes,
   platformLabel,
   validRedirectUri,
@@ -8,7 +7,7 @@ import {
 } from "@/lib/platforms";
 import { one, rows, tx } from "./db";
 import { randomToken, sha256, uid } from "./crypto";
-import { enabledPlatforms } from "./platforms";
+import { effectiveMethods, isMethod, type MethodView } from "./methods";
 import { logActivity } from "./activity";
 import type { SessionUser } from "./session";
 
@@ -35,6 +34,11 @@ export type DeveloperAppView = {
   redirectUris: string[];
   clientId: string;
   createdAt: string;
+  /** Saved choice; empty means every available method. */
+  signInMethods: string[];
+  /** What the widget shows today. */
+  methods: MethodView[];
+  widgetTheme: "light" | "dark";
 };
 
 export type ActivityView = { id: string; action: string; detail: string; at: string };
@@ -43,7 +47,6 @@ export type WorkspaceView = {
   user: SessionUser;
   accounts: AccountView[];
   authorizedApps: AuthorizedAppView[];
-  developerApps: DeveloperAppView[];
   activity: ActivityView[];
 };
 
@@ -96,17 +99,6 @@ export async function getWorkspace(user: SessionUser): Promise<WorkspaceView> {
     app.grants.push({ accountId: grant.account_id, scopes: parseScopes(grant.scopes) });
     authorized.set(grant.app_id, app);
   }
-  const apps = await rows<{
-    id: string;
-    name: string;
-    homepage_url: string;
-    redirect_uris: string[];
-    client_id: string;
-    created_at: Date;
-  }>(
-    `select id, name, homepage_url, redirect_uris, client_id, created_at from apps where owner_id = $1 order by created_at`,
-    [user.id],
-  );
   const activity = await rows<{ id: string; action: string; detail: string; created_at: Date }>(
     `select id, action, detail, created_at from activity where user_id = $1 order by created_at desc limit 50`,
     [user.id],
@@ -115,14 +107,6 @@ export async function getWorkspace(user: SessionUser): Promise<WorkspaceView> {
     user,
     accounts: await listAccounts(user.id),
     authorizedApps: [...authorized.values()],
-    developerApps: apps.map((app) => ({
-      id: app.id,
-      name: app.name,
-      homepageUrl: app.homepage_url,
-      redirectUris: app.redirect_uris,
-      clientId: app.client_id,
-      createdAt: iso(app.created_at),
-    })),
     activity: activity.map((row) => ({
       id: row.id,
       action: row.action,
@@ -180,7 +164,7 @@ function cleanRedirectUris(input: string[]): string[] | null {
 export async function createApp(
   userId: string,
   input: { name: string; homepageUrl: string; redirectUris: string[] },
-): Promise<Result<{ clientId: string; clientSecret: string }>> {
+): Promise<Result<{ appId: string; clientId: string; clientSecret: string }>> {
   const name = input.name.trim().slice(0, 60);
   if (name.length < 2) return { ok: false, error: "Name the app in at least two characters." };
   if (!validRedirectUri(input.homepageUrl.trim()))
@@ -197,14 +181,15 @@ export async function createApp(
   );
   if ((count?.n ?? 0) >= 25)
     return { ok: false, error: "This account already owns the maximum of 25 apps." };
+  const appId = uid();
   const clientId = randomToken("ihub_pk_");
   const clientSecret = randomToken("ihub_sk_");
   await rows(
     `insert into apps (id, owner_id, name, homepage_url, redirect_uris, client_id, client_secret_hash) values ($1, $2, $3, $4, $5, $6, $7)`,
-    [uid(), userId, name, input.homepageUrl.trim(), redirectUris, clientId, sha256(clientSecret)],
+    [appId, userId, name, input.homepageUrl.trim(), redirectUris, clientId, sha256(clientSecret)],
   );
   await logActivity(userId, "App registered", name);
-  return { ok: true, clientId, clientSecret };
+  return { ok: true, appId, clientId, clientSecret };
 }
 
 export async function updateApp(
@@ -261,7 +246,64 @@ export async function deleteUser(userId: string): Promise<void> {
   await rows(`delete from users where id = $1`, [userId]);
 }
 
-export function platformsForLogin(): { id: PlatformId; label: string }[] {
-  const enabled = new Set(enabledPlatforms());
-  return PLATFORMS.filter((p) => enabled.has(p.id)).map((p) => ({ id: p.id, label: p.label }));
+type AppRow = {
+  id: string;
+  name: string;
+  homepage_url: string;
+  redirect_uris: string[];
+  client_id: string;
+  created_at: Date;
+  sign_in_methods: string[];
+  widget_theme: "light" | "dark";
+};
+
+const APP_COLUMNS = `id, name, homepage_url, redirect_uris, client_id, created_at, sign_in_methods, widget_theme`;
+
+function appView(app: AppRow): DeveloperAppView {
+  return {
+    id: app.id,
+    name: app.name,
+    homepageUrl: app.homepage_url,
+    redirectUris: app.redirect_uris,
+    clientId: app.client_id,
+    createdAt: iso(app.created_at),
+    signInMethods: app.sign_in_methods,
+    methods: effectiveMethods(app.sign_in_methods),
+    widgetTheme: app.widget_theme,
+  };
+}
+
+export async function listDeveloperApps(userId: string): Promise<DeveloperAppView[]> {
+  const apps = await rows<AppRow>(
+    `select ${APP_COLUMNS} from apps where owner_id = $1 order by created_at`,
+    [userId],
+  );
+  return apps.map(appView);
+}
+
+export async function getDeveloperApp(
+  userId: string,
+  appId: string,
+): Promise<DeveloperAppView | null> {
+  const app = await one<AppRow>(`select ${APP_COLUMNS} from apps where id = $1 and owner_id = $2`, [
+    appId,
+    userId,
+  ]);
+  return app ? appView(app) : null;
+}
+
+/** Save which sign-in methods the app's widget and consent screen offer, and the widget theme. */
+export async function updateWidget(
+  userId: string,
+  input: { appId: string; methods: string[]; theme: string },
+): Promise<Result<{ app: DeveloperAppView }>> {
+  const methods = [...new Set(input.methods)].filter(isMethod);
+  if (methods.length === 0) return { ok: false, error: "Keep at least one sign-in method." };
+  if (input.theme !== "light" && input.theme !== "dark")
+    return { ok: false, error: "Choose light or dark." };
+  const app = await one<AppRow>(
+    `update apps set sign_in_methods = $3, widget_theme = $4 where id = $1 and owner_id = $2 returning ${APP_COLUMNS}`,
+    [input.appId, userId, methods, input.theme],
+  );
+  return app ? { ok: true, app: appView(app) } : { ok: false, error: "That app is not yours." };
 }

@@ -3,8 +3,8 @@
 #
 #   bash scripts/env-from-socialpostapi.sh [socialpostapi .env] [identityhub .env] [app origin]
 #
-# Copies the platform client ids and secrets (same variable names in both
-# apps), generates POSTGRES_PASSWORD and TOKEN_ENCRYPTION_KEY when they are
+# Copies the platform client ids and secrets and the SMTP settings (same
+# variable names in both apps), generates POSTGRES_PASSWORD and TOKEN_ENCRYPTION_KEY when they are
 # not set yet, and never overwrites a value that is already set: changing
 # TOKEN_ENCRYPTION_KEY would make every stored platform token unreadable.
 # Prints variable names only, never values.
@@ -51,6 +51,12 @@ for prefix in TWITTER INSTAGRAM FACEBOOK TIKTOK LINKEDIN YOUTUBE REDDIT SNAPCHAT
   put "${prefix}_CLIENT_SECRET" "$(get "${prefix}_CLIENT_SECRET" "$SOURCE")"
 done
 
+# Outgoing email for sign-up, password reset and security notices.
+for key in SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_USE_TLS; do
+  put "$key" "$(get "$key" "$SOURCE")"
+done
+put SMTP_FROM_EMAIL "$(get SMTP_FROM_EMAIL "$SOURCE")"
+
 # SocialPostAPI hardcodes its Facebook Login for Business configuration in
 # app/platforms/facebook/config.py; the hub reads it from the environment.
 fb_config="$(get FACEBOOK_LOGIN_CONFIG_ID "$SOURCE")"
@@ -58,3 +64,4 @@ put FACEBOOK_LOGIN_CONFIG_ID "${fb_config:-4572491769705504}"
 
 echo
 echo "Wrote $TARGET. 'missing' lines need a value by hand (Snapchat needs its own Snap Kit app)."
+echo "SMTP_FROM_EMAIL is copied from SocialPostAPI; change it if the hub should send from another address."

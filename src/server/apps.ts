@@ -17,6 +17,7 @@ import {
 import { credentials, platform } from "./platforms";
 import { logActivity } from "./activity";
 import { listAccounts, type AccountView, type Result } from "./workspace";
+import { effectiveMethods, type MethodView } from "./methods";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -28,13 +29,27 @@ type AppRow = {
   homepage_url: string;
   redirect_uris: string[];
   client_secret_hash: string;
+  sign_in_methods: string[];
+  widget_theme: "light" | "dark";
 };
 
 async function appByClientId(clientId: string): Promise<AppRow | undefined> {
   return one<AppRow>(
-    `select id, name, homepage_url, redirect_uris, client_secret_hash from apps where client_id = $1`,
+    `select id, name, homepage_url, redirect_uris, client_secret_hash, sign_in_methods, widget_theme from apps where client_id = $1`,
     [clientId],
   );
+}
+
+/** GET /api/v1/widget/{client_id}: what the embeddable widget renders. Public. */
+export async function widgetConfig(clientId: string) {
+  const app = await appByClientId(clientId);
+  if (!app) throw new ApiError(404, "not_found", "Unknown client_id.");
+  return {
+    name: app.name,
+    theme: app.widget_theme,
+    methods: effectiveMethods(app.sign_in_methods),
+    redirect_uris: app.redirect_uris,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -48,8 +63,10 @@ export type AuthorizeRequest = {
   scope?: string;
 };
 
+export type ConsentApp = { name: string; homepageUrl: string; methods: MethodView[] };
+
 export type ConsentView = {
-  app: { name: string; homepageUrl: string };
+  app: ConsentApp;
   scopes: ScopeId[];
   accounts: (AccountView & { grantable: ScopeId[]; granted: boolean })[];
 };
@@ -58,7 +75,7 @@ export type ConsentView = {
 export async function consentView(
   userId: string | null,
   request: AuthorizeRequest,
-): Promise<Result<{ view: ConsentView | null; app: { name: string; homepageUrl: string } }>> {
+): Promise<Result<{ view: ConsentView | null; app: ConsentApp }>> {
   const app = await appByClientId(request.clientId);
   if (!app) return { ok: false, error: "Unknown client_id." };
   if (!app.redirect_uris.includes(request.redirectUri))
@@ -66,7 +83,10 @@ export async function consentView(
   const scopes = parseScopes(request.scope || "profile");
   if (scopes.length === 0)
     return { ok: false, error: "scope must include profile and/or publish." };
-  const summary = { name: app.name, homepageUrl: app.homepage_url };
+  const methods = effectiveMethods(app.sign_in_methods);
+  const summary = { name: app.name, homepageUrl: app.homepage_url, methods };
+  // An app that limits its platforms only sees accounts on those platforms.
+  const platforms = new Set<string>(methods.map((method) => method.id));
   if (!userId) return { ok: true, view: null, app: summary };
 
   const granted = new Set(
@@ -77,11 +97,13 @@ export async function consentView(
       )
     ).map((row) => row.account_id),
   );
-  const accounts = (await listAccounts(userId)).map((account) => ({
-    ...account,
-    grantable: scopes.filter((scope) => platformInfo(account.provider)?.scopes.includes(scope)),
-    granted: granted.has(account.id),
-  }));
+  const accounts = (await listAccounts(userId))
+    .filter((account) => platforms.has(account.provider))
+    .map((account) => ({
+      ...account,
+      grantable: scopes.filter((scope) => platformInfo(account.provider)?.scopes.includes(scope)),
+      granted: granted.has(account.id),
+    }));
   return { ok: true, view: { app: summary, scopes, accounts }, app: summary };
 }
 
@@ -104,7 +126,7 @@ export async function approve(
   const chosen = view.accounts.filter(
     (account) => request.accountIds.includes(account.id) && account.grantable.length > 0,
   );
-  if (chosen.length === 0) return { ok: false, error: "Choose at least one account to share." };
+  // Sharing no accounts is allowed: the app then only learns who signed in.
 
   const code = randomToken("code_");
   await tx(async (client) => {
@@ -129,7 +151,9 @@ export async function approve(
   await logActivity(
     userId,
     "App authorized",
-    `${app.name} may use ${chosen.map((a) => `${platformLabel(a.provider)} ${a.handle} (${a.grantable.join(", ")})`).join("; ")}`,
+    chosen.length === 0
+      ? `${app.name} received your identity only`
+      : `${app.name} may use ${chosen.map((a) => `${platformLabel(a.provider)} ${a.handle} (${a.grantable.join(", ")})`).join("; ")}`,
   );
   return { ok: true, redirect: redirectWith(request.redirectUri, { code, state: request.state }) };
 }
@@ -186,7 +210,12 @@ export async function readBody(request: Request): Promise<Record<string, string>
   return Object.fromEntries(new URLSearchParams(await request.text()));
 }
 
-type UserRow = { id: string; display_name: string; avatar_url: string | null };
+type UserRow = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  email: string | null;
+};
 
 async function grantedAccounts(userId: string, appId: string) {
   const found = await rows<{
@@ -215,11 +244,18 @@ async function grantedAccounts(userId: string, appId: string) {
 }
 
 async function identityPayload(userId: string, appId: string) {
-  const user = (await one<UserRow>(`select id, display_name, avatar_url from users where id = $1`, [
-    userId,
-  ]))!;
+  const user = (await one<UserRow>(
+    `select id, display_name, avatar_url, email from users where id = $1`,
+    [userId],
+  ))!;
   return {
-    user: { id: user.id, display_name: user.display_name, avatar_url: user.avatar_url },
+    // email is only ever set once its owner confirmed it, so it is verified.
+    user: {
+      id: user.id,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      email: user.email,
+    },
     accounts: await grantedAccounts(userId, appId),
   };
 }

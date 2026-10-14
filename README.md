@@ -1,14 +1,15 @@
 # Identity Hub
 
-One login for the Makketing suite. People sign in with a social platform they already use, connect the other accounts they publish to, and choose which of those accounts each app (SocialPostAPI, Makketing, and later others) may use. Platform tokens stay encrypted on the hub; an app's server asks for one only when it needs to publish.
+One login for the Makketing suite. People sign in with a social platform they already use or with an email and password, connect the other accounts they publish to, and choose which of those accounts each app (SocialPostAPI, Makketing, and later others) may use. Platform tokens stay encrypted on the hub; an app's server asks for one only when it needs to publish.
 
 Supported: X, Instagram, Facebook (one account per Page), TikTok, LinkedIn, YouTube, Reddit, and Snapchat (sign-in only: Snap has no posting API, so Snapchat accounts only ever carry `profile`). The OAuth details per platform mirror SocialPostAPI's connectors.
 
 ## How it works
 
-1. **Sign in** at `/login` with any configured platform. The first sign-in creates the user; that platform account is connected too.
+1. **Sign in** at `/login` with any configured platform, or with email and password (`/signup`, confirmed by an emailed link). The first platform sign-in creates the user and connects that account. People who started with a platform can add an email and password in `/settings`, and turn on authenticator-app two-factor there.
 2. **Connect** more accounts from `/workspace`. Connecting also lets that platform identity sign in to the same user.
-3. **Authorize** an app at `/authorize`. The person picks accounts; the app gets a one-time code, exchanges it server-side for a long-lived app token, reads the person and granted accounts, and requests platform tokens for accounts granted `publish`.
+3. **Choose sign-in methods and copy the widget** for each app at `/apps/{id}`: tick platforms and email/password, pick a theme, watch the live preview, copy the snippet. The widget fetches its settings from the hub, so later changes need no code change.
+4. **Authorize** an app at `/authorize`. The person picks accounts; the app gets a one-time code, exchanges it server-side for a long-lived app token, reads the person and granted accounts, and requests platform tokens for accounts granted `publish`.
 
 ## App API
 
@@ -16,8 +17,10 @@ Full walkthrough with examples: `/docs` on a running hub (`src/routes/docs.tsx`)
 
 | Method and path | Auth | Purpose |
 |---|---|---|
-| `GET /authorize?client_id&redirect_uri&scope&state` | browser | Consent screen. `scope` is `profile`, `publish` or both. Redirects back with `code` and `state`, or `error=access_denied`. |
-| `POST /api/v1/oauth/token` | client id and secret (body or Basic) | `grant_type=authorization_code`, `code`, `redirect_uri`. Returns `access_token`, `user`, `accounts`. Codes are single use, ten minutes. |
+| `GET /authorize?client_id&redirect_uri&scope&state[&method]` | browser | Sign-in and consent, limited to the app's chosen methods. `scope` is `profile`, `publish` or both; `method` (a platform id or `password`) skips the method choice. Redirects back with `code` and `state`, or `error=access_denied`. |
+| `GET /widget.js` | none | The embeddable sign-in widget. See the snippet on each app's page. |
+| `GET /api/v1/widget/{client_id}` | none (CORS `*`) | The widget's live config: app name, theme, sign-in methods. |
+| `POST /api/v1/oauth/token` | client id and secret (body or Basic) | `grant_type=authorization_code`, `code`, `redirect_uri`. Returns `access_token`, `user` (`id`, `display_name`, `avatar_url`, `email`, which is null for platform-only people and otherwise confirmed), `accounts` (may be empty). Codes are single use, ten minutes. |
 | `GET /api/v1/me` | `Bearer ihub_at_...` | The user and the accounts granted to this app. |
 | `POST /api/v1/accounts/{id}/token` | `Bearer ihub_at_...` | Current platform access token for an account granted `publish`; refreshed first when it expires within five minutes. |
 | `POST /api/v1/oauth/revoke` | client id and secret | `token=ihub_at_...`. |
@@ -27,7 +30,7 @@ Errors are `{ "error", "error_description" }`: `invalid_client` 401, `invalid_gr
 
 App tokens do not expire. They stop working when the person removes the app in their workspace, deletes their account, the app revokes the token, or the app is deleted.
 
-Apps are registered in the workspace ("Your apps") with exact redirect URIs. The client secret is shown once and stored as a SHA-256 hash.
+Apps are registered under Apps with exact redirect URIs. The client secret is shown once and stored as a SHA-256 hash.
 
 ## Configuration
 
@@ -38,6 +41,8 @@ Apps are registered in the workspace ("Your apps") with exact redirect URIs. The
 | Token encryption | `TOKEN_ENCRYPTION_KEY` (any long random string; AES-256-GCM key is derived from it) |
 | Platforms | `TWITTER_`, `INSTAGRAM_`, `FACEBOOK_`, `TIKTOK_`, `LINKEDIN_`, `YOUTUBE_`, `REDDIT_`, `SNAPCHAT_` + `CLIENT_ID` / `CLIENT_SECRET` |
 | Facebook Page picker (optional) | `FACEBOOK_LOGIN_CONFIG_ID` |
+| Email (sign-up, reset, security notices) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS` (same names as SocialPostAPI). Email and password sign-in is offered only once `SMTP_HOST` and `SMTP_FROM_EMAIL` are set. |
+| Rate-limit client IPs (optional) | `TRUSTED_PROXIES`: proxies whose `X-Forwarded-For` is believed. Defaults to loopback and private ranges, which covers Caddy reaching the hub over Docker. |
 
 The platform variable names match SocialPostAPI's, so the same developer apps can serve both. A platform appears on the sign-in page once both of its values are set. Register this callback on each platform app, in addition to SocialPostAPI's own:
 
@@ -46,6 +51,19 @@ The platform variable names match SocialPostAPI's, so the same developer apps ca
 ```
 
 Use `{APP_ORIGIN}/deletion` as the data deletion URL and `{APP_ORIGIN}/privacy` as the privacy policy URL in each platform's app settings.
+
+## Security
+
+Email and password accounts follow NIST SP 800-63B-4 and the OWASP authentication, password storage, session and CSRF cheat sheets:
+
+- **Passwords**: 15 to 256 characters, no composition rules, Unicode NFKC-normalized, nothing truncated. Refused when found in Have I Been Pwned (k-anonymity range API with padding; only a 5-character SHA-1 prefix leaves the server; the check fails open if the service is down) or when built from the person's name, email or this service's name. Stored as Argon2id (19 MiB, 2 iterations, 1 lane, 16-byte salt), upgraded on sign-in if the parameters ever rise.
+- **No account enumeration**: sign-up, sign-in and reset give the same answer for registered and unknown addresses, and an unknown address costs the same hashing work. Sign-up creates nothing until the mailbox owner clicks the link, so addresses cannot be squatted; a second sign-up for a registered address emails its owner instead.
+- **Brute force**: per-IP and per-address fixed windows in Postgres (shared by every process); the per-address lock lasts 15 minutes, so it cannot lock anyone out for long. Client IPs come from `X-Forwarded-For` only when the direct peer is a trusted proxy, so the public port cannot spoof them.
+- **Two-factor**: RFC 6238 TOTP (authenticator apps) with replay protection and ten single-use recovery codes, all stored encrypted or hashed. Sensitive changes (turning two-factor off, new recovery codes, deleting the account) require the current password.
+- **Email links**: 32 random bytes, stored as SHA-256, single use; sign-up links expire in 24 hours, reset links in 30 minutes. A reset ends every session; a password change ends every other session; both, and two-factor changes, email the owner.
+- **Sessions**: a new random token per sign-in, stored hashed, in a `__Host-` cookie (HttpOnly, Secure, SameSite=Lax) on https; 7-day idle and 30-day absolute timeouts; "sign out everywhere else" in settings.
+- **Browser**: per-request nonce Content-Security-Policy with `strict-dynamic`, `frame-ancestors 'none'`, HSTS on https, `nosniff`, a strict referrer policy, COOP, CORP and `no-store` on pages. Server functions and the sign-out form are CSRF-checked (Sec-Fetch-Site, then Origin). Fonts are self-hosted.
+- **Widget**: passwords are never typed on the host site; every widget button opens the hub. The widget sets a random `state` in the `ihub_state` cookie on the host site, which the app's callback must compare with the returned `state`.
 
 ## Deploy (Docker)
 
@@ -84,7 +102,7 @@ DATABASE_URL=postgres://... APP_ORIGIN=http://localhost:8080 TOKEN_ENCRYPTION_KE
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test`.
 
-End-to-end test (run `npm run build` first): it wipes the given database, starts the built server with every platform faked (`scripts/e2e/mock-platforms.mjs`), and drives sign-in, connect, app registration, consent, code exchange, `/me`, platform-token refresh, revocation, a second user and data deletion in Chromium.
+End-to-end test (run `npm run build` first): it wipes the given database, starts the built server with every platform and the breach API faked (`scripts/e2e/mock-platforms.mjs`) and email written to a file, and drives in Chromium: platform sign-in and connect, app registration, consent, code exchange, `/me`, platform-token refresh, a second user, security headers and CSRF, email sign-up with breached and personal passwords refused, enumeration-safe answers, the per-address lock, password reset ending sessions, two-factor with codes and recovery codes, the widget builder and the copied widget signing someone in from another site, revocation and data deletion. It fails on any CSP violation or script error.
 
 ```bash
 npm run build

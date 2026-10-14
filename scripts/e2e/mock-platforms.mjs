@@ -5,7 +5,11 @@
  *
  * The authorization code chooses the person: code "alice" signs in as alice.
  */
+import { createHash } from "node:crypto";
+
 const realFetch = globalThis.fetch;
+/** Passwords the fake Have I Been Pwned range API reports as breached. */
+const BREACHED = ["correct horse battery staple"];
 let issued = 0;
 
 const json = (body, status = 200) =>
@@ -33,6 +37,15 @@ async function codeFrom(init) {
 }
 
 const handlers = {
+  "api.pwnedpasswords.com": async (url) => {
+    const prefix = url.pathname.split("/").pop().toUpperCase();
+    const lines = ["0018A45C4D1DEF81644B54AB7F969B88D65:0"];
+    for (const password of BREACHED) {
+      const sha1 = createHash("sha1").update(password).digest("hex").toUpperCase();
+      if (sha1.startsWith(prefix)) lines.push(`${sha1.slice(5)}:3861493`);
+    }
+    return new Response(lines.join("\r\n"), { status: 200 });
+  },
   "api.twitter.com": async (url, init) => {
     if (url.pathname === "/2/oauth2/token") {
       const body = init.body;

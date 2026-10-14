@@ -29,19 +29,43 @@ function Docs() {
     <Page width="max-w-3xl">
       <h1 className="text-4xl font-semibold tracking-tight">Integrate an app</h1>
       <p className="mt-3 text-muted">
-        Identity Hub is an OAuth 2.0 authorization server. People sign in with a social platform,
-        and your app receives their identity plus the accounts they chose to share. Platform tokens
-        stay on the hub; your server asks for one only when it needs to publish.
+        Identity Hub is an OAuth 2.0 authorization server. People sign in with a social platform or
+        with an email and password, and your app receives their identity plus the accounts they
+        chose to share. Platform tokens stay on the hub; your server asks for one only when it needs
+        to publish.
       </p>
 
       <Step title="1. Register the app">
         <p>
-          Sign in, open the workspace and register the app with its homepage and exact redirect
-          URIs. Copy the client secret when it is shown; it is stored only as a hash.
+          Sign in, open Apps and register the app with its homepage and exact redirect URIs. Copy
+          the client secret when it is shown; it is stored only as a hash.
         </p>
       </Step>
 
-      <Step title="2. Send the person to the hub">
+      <Step title="2a. Quick start: the sign-in widget">
+        <p>
+          On the app's page, tick the sign-in methods you want (any configured platform and email
+          and password), pick a theme, and copy the code. The preview shows exactly what your
+          visitors will see. Method and theme changes reach live widgets within a minute without
+          touching the code.
+        </p>
+        <Code>{`<div id="identity-hub"></div>
+<script src="{HUB}/widget.js"
+        data-client-id="ihub_pk_..."
+        data-redirect-uri="https://your.app/callback"
+        data-scope="profile" async></script>`}</Code>
+        <p>
+          Every button opens the hub: passwords are only ever typed on Identity Hub, never on your
+          site. Before leaving, the widget stores a random state in the cookie{" "}
+          <strong>ihub_state</strong> on your site. Your callback must check that the state query
+          parameter equals that cookie, then continue with step 3. The widget's styles live in a
+          shadow root and use a constructed stylesheet, so they neither leak into your page nor need{" "}
+          <strong>style-src 'unsafe-inline'</strong> in your CSP; allow the hub origin in{" "}
+          <strong>script-src</strong> and <strong>connect-src</strong>.
+        </p>
+      </Step>
+
+      <Step title="2b. Or send the person to the hub yourself">
         <p>
           Redirect the browser to <strong>/authorize</strong>. Use a fresh random state and check it
           when they come back. Scope is
@@ -51,10 +75,12 @@ function Docs() {
   ?client_id=ihub_pk_...
   &redirect_uri=https://socialpostapi.makketing.com/auth/identityhub/callback
   &scope=profile publish
-  &state=RANDOM`}</Code>
+  &state=RANDOM
+  [&method=twitter|instagram|...|password]`}</Code>
         <p>
-          They sign in (if needed), pick accounts and allow. The hub redirects to your redirect URI
-          with
+          With method, the hub skips its own choice screen and goes straight to that platform or to
+          the email form. They sign in (if needed), pick accounts and allow. The hub redirects to
+          your redirect URI with
           <strong> code</strong> and <strong>state</strong>, or with{" "}
           <strong>error=access_denied</strong>.
         </p>
@@ -73,7 +99,8 @@ grant_type=authorization_code&code=code_...&redirect_uri=...
         <Code>{`{
   "access_token": "ihub_at_...",
   "token_type": "Bearer",
-  "user": { "id": "...", "display_name": "...", "avatar_url": "..." },
+  "user": { "id": "...", "display_name": "...", "avatar_url": "...",
+            "email": "person@example.com" },
   "accounts": [
     { "id": "...", "platform": "twitter", "platform_account_id": "...",
       "handle": "@studio", "display_name": "Studio", "avatar_url": "...",
@@ -83,7 +110,9 @@ grant_type=authorization_code&code=code_...&redirect_uri=...
         <p>
           The access token does not expire. Store it server side; it stops working when the person
           removes your app or you revoke it. Use <strong>user.id</strong> as the stable id for your
-          own user record.
+          own user record. email is null for people who only sign in with a platform, and when
+          present it has been confirmed by its owner. accounts can be empty: a person may sign in
+          without sharing any platform account.
         </p>
       </Step>
 
@@ -133,6 +162,30 @@ token=ihub_at_...&client_id=ihub_pk_...&client_secret=ihub_sk_...`}</Code>
           support profile and publish. Snapchat is sign-in only: Snap offers no API for posting, so
           its accounts only ever carry profile.
         </p>
+      </Step>
+
+      <Step title="How email and password accounts are protected">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            Passwords: at least 15 characters, no composition rules, checked against known breaches
+            (k-anonymity, only a 5-character hash prefix leaves the hub), stored with Argon2id.
+          </li>
+          <li>
+            An account is only created when its owner clicks the emailed link; sign-up, sign-in and
+            reset never reveal whether an address is registered.
+          </li>
+          <li>
+            Repeated failures are limited per address and per IP; optional authenticator-app
+            two-factor with single-use recovery codes.
+          </li>
+          <li>
+            Changing or resetting a password signs out every other session and emails the owner.
+          </li>
+          <li>
+            Sessions use a __Host- cookie (HttpOnly, Secure, SameSite=Lax) with idle and absolute
+            timeouts; every page sends a nonce-based Content-Security-Policy and refuses framing.
+          </li>
+        </ul>
       </Step>
     </Page>
   );

@@ -32,12 +32,24 @@ export function SiteHeader() {
         <nav aria-label="Main" className="flex items-center gap-1">
           <Link
             to="/docs"
-            className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg"
+            className="hidden min-h-11 sm:inline-flex items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg"
           >
             Docs
           </Link>
           {user ? (
             <>
+              <Link
+                to="/apps"
+                className="hidden min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg sm:inline-flex"
+              >
+                Apps
+              </Link>
+              <Link
+                to="/settings"
+                className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-muted no-underline hover:text-fg"
+              >
+                Settings
+              </Link>
               <Link
                 to="/workspace"
                 className="inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-sm font-semibold text-on-ink no-underline hover:opacity-85"
@@ -101,6 +113,15 @@ export function ErrorNote({ message }: { message: string | null | undefined }) {
   if (!message) return null;
   return (
     <p role="alert" className="mt-4 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
+      {message}
+    </p>
+  );
+}
+
+export function SuccessNote({ message }: { message: string | null | undefined }) {
+  if (!message) return null;
+  return (
+    <p role="status" className="mt-4 rounded-xl bg-ok-soft px-4 py-3 text-sm text-ok">
       {message}
     </p>
   );

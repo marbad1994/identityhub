@@ -10,10 +10,11 @@ const requireUser = createMiddleware({ type: "function" }).server(async ({ next 
   return next({ context: { user } });
 });
 
+/** The signed-in user (or null) and every sign-in method this hub offers. */
 export const fetchSession = createServerFn({ method: "GET" }).handler(async () => {
-  const { platformsForLogin } = await import("@/server/workspace");
+  const { availableMethods } = await import("@/server/methods");
   const { currentUser } = await import("@/server/request");
-  return { user: await currentUser(), platforms: platformsForLogin() };
+  return { user: await currentUser(), methods: availableMethods() };
 });
 
 export const fetchWorkspace = createServerFn({ method: "GET" })
@@ -79,8 +80,12 @@ export const deleteApp = createServerFn({ method: "POST" })
 
 export const deleteMyData = createServerFn({ method: "POST" })
   .middleware([requireUser])
-  .handler(async ({ context }) => {
+  .validator(z.object({ password: z.string().max(1024).optional() }))
+  .handler(async ({ context, data }) => {
     const { deleteUser } = await import("@/server/workspace");
+    const { confirmDeletion } = await import("@/server/password-auth");
+    const denied = await confirmDeletion(context.user, data.password);
+    if (denied) return denied;
     await deleteUser(context.user.id);
     return { ok: true as const };
   });
@@ -114,4 +119,176 @@ export const denyConsent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { deny } = await import("@/server/apps");
     return deny(data);
+  });
+
+// ---------------------------------------------------------------------------
+// Developer apps and the sign-in widget
+// ---------------------------------------------------------------------------
+
+export const fetchDeveloperApps = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    const { listDeveloperApps } = await import("@/server/workspace");
+    return listDeveloperApps(context.user.id);
+  });
+
+export const fetchDeveloperApp = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ appId: z.string().max(64) }))
+  .handler(async ({ context, data }) => {
+    const { getDeveloperApp } = await import("@/server/workspace");
+    const { availableMethods } = await import("@/server/methods");
+    const { appOrigin } = await import("@/server/env");
+    return {
+      app: await getDeveloperApp(context.user.id, data.appId),
+      available: availableMethods(),
+      hubOrigin: appOrigin(),
+    };
+  });
+
+export const saveWidget = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(
+    z.object({
+      appId: z.string().max(64),
+      methods: z.array(z.string().max(20)).max(20),
+      theme: z.string().max(10),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const { updateWidget } = await import("@/server/workspace");
+    return updateWidget(context.user.id, data);
+  });
+
+// ---------------------------------------------------------------------------
+// Email and password
+// ---------------------------------------------------------------------------
+
+/** Long enough for any real password, short enough to bound hashing work. */
+const password = z.string().max(1024);
+const email = z.string().max(320);
+
+async function withContext() {
+  const { requestContext, setCookies } = await import("@/server/request");
+  return { ctx: requestContext(), setCookies };
+}
+
+export const signUp = createServerFn({ method: "POST" })
+  .validator(
+    z.object({ name: z.string().max(200), email, password, returnTo: z.string().max(2000) }),
+  )
+  .handler(async ({ data }) => {
+    const { signUp } = await import("@/server/password-auth");
+    return signUp(data, (await withContext()).ctx);
+  });
+
+export const logIn = createServerFn({ method: "POST" })
+  .validator(z.object({ email, password, returnTo: z.string().max(2000) }))
+  .handler(async ({ data }) => {
+    const { login } = await import("@/server/password-auth");
+    const { ctx, setCookies } = await withContext();
+    const result = await login(data, ctx);
+    if (!result.ok) return result;
+    setCookies(result.setCookies);
+    return "mfaRequired" in result
+      ? { ok: true as const, mfaRequired: true as const }
+      : { ok: true as const, redirect: result.redirect };
+  });
+
+export const logInSecondFactor = createServerFn({ method: "POST" })
+  .validator(z.object({ code: z.string().max(40) }))
+  .handler(async ({ data }) => {
+    const { loginSecondFactor, challengeCookieName } = await import("@/server/password-auth");
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const { ctx, setCookies } = await withContext();
+    const result = await loginSecondFactor(data, getCookie(challengeCookieName()) ?? null, ctx);
+    if (!result.ok) return result;
+    setCookies(result.setCookies);
+    return { ok: true as const, redirect: result.redirect };
+  });
+
+export const requestPasswordReset = createServerFn({ method: "POST" })
+  .validator(z.object({ email }))
+  .handler(async ({ data }) => {
+    const { requestPasswordReset } = await import("@/server/password-auth");
+    return requestPasswordReset(data, (await withContext()).ctx);
+  });
+
+export const checkResetToken = createServerFn({ method: "GET" })
+  .validator(z.object({ token: z.string().max(200) }))
+  .handler(async ({ data }) => {
+    const { resetTokenValid } = await import("@/server/password-auth");
+    return { valid: await resetTokenValid(data.token) };
+  });
+
+export const resetPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ token: z.string().max(200), password }))
+  .handler(async ({ data }) => {
+    const { resetPassword } = await import("@/server/password-auth");
+    return resetPassword(data, (await withContext()).ctx);
+  });
+
+// ---------------------------------------------------------------------------
+// Account security settings
+// ---------------------------------------------------------------------------
+
+export const fetchSecurity = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    const { securityView } = await import("@/server/password-auth");
+    return securityView(context.user);
+  });
+
+export const addEmailAndPassword = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ email, password }))
+  .handler(async ({ context, data }) => {
+    const { addEmailAndPassword } = await import("@/server/password-auth");
+    return addEmailAndPassword(context.user, data);
+  });
+
+export const changePassword = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ current: password, next: password }))
+  .handler(async ({ context, data }) => {
+    const { changePassword } = await import("@/server/password-auth");
+    return changePassword(context.user, data, (await withContext()).ctx);
+  });
+
+export const beginTwoFactor = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    const { beginTwoFactor } = await import("@/server/password-auth");
+    return beginTwoFactor(context.user);
+  });
+
+export const enableTwoFactor = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ code: z.string().max(20) }))
+  .handler(async ({ context, data }) => {
+    const { enableTwoFactor } = await import("@/server/password-auth");
+    return enableTwoFactor(context.user, data);
+  });
+
+export const disableTwoFactor = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ password }))
+  .handler(async ({ context, data }) => {
+    const { disableTwoFactor } = await import("@/server/password-auth");
+    return disableTwoFactor(context.user, data);
+  });
+
+export const regenerateRecoveryCodes = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ password }))
+  .handler(async ({ context, data }) => {
+    const { regenerateRecoveryCodes } = await import("@/server/password-auth");
+    return regenerateRecoveryCodes(context.user, data);
+  });
+
+export const signOutOtherSessions = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    const { signOutOtherSessions } = await import("@/server/password-auth");
+    return signOutOtherSessions(context.user, (await withContext()).ctx);
   });

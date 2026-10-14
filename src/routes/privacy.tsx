@@ -17,10 +17,20 @@ function Privacy() {
           encrypted with AES-256-GCM before they are written.
         </p>
         <p>
-          An app you authorize receives your Identity Hub user id, name and picture, and the name,
-          handle and picture of the accounts you chose. Only for accounts granted with publish
-          access can the app request that account's platform access token, from its server, to post
-          on your behalf.
+          If you use email and password, we store your name, your email address once you confirm it,
+          and an Argon2id hash of your password (never the password itself). To check it against
+          known breaches, only the first five characters of its SHA-1 hash are sent to Have I Been
+          Pwned. Two-factor secrets are encrypted; recovery codes are stored as hashes.
+        </p>
+        <p>
+          To stop password guessing and abuse we count attempts per IP address and per email
+          address. Those counters are deleted within a day.
+        </p>
+        <p>
+          An app you authorize receives your Identity Hub user id, name, picture and confirmed email
+          address, and the name, handle and picture of the accounts you chose. Only for accounts
+          granted with publish access can the app request that account's platform access token, from
+          its server, to post on your behalf.
         </p>
         <p>
           We keep a log of sign-ins, connections and grants so you can see who has access. We do not

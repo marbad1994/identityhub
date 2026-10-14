@@ -125,8 +125,8 @@ async function userForLogin(
 }
 
 /** Handle the platform's redirect back to `/api/auth/callback/<provider>`. */
-export async function finishAuthorization(provider: string, requestUrl: string): Promise<Redirect> {
-  const url = new URL(requestUrl);
+export async function finishAuthorization(provider: string, request: Request): Promise<Redirect> {
+  const url = new URL(request.url);
   const state = url.searchParams.get("state") ?? "";
   const pending = await one<{
     intent: "login" | "connect";
@@ -207,7 +207,7 @@ export async function finishAuthorization(provider: string, requestUrl: string):
     const userId = await userForLogin(client, p.id, login);
     await upsertAccounts(client, userId, p.id, login);
     await logActivity(userId, "Signed in", `With ${label} as ${login.subject.displayName}`, client);
-    const setCookie = await createSession(userId, client);
+    const setCookie = await createSession(userId, request.headers.get("user-agent"), client);
     return { location: safeReturnTo(pending.return_to, "/workspace"), setCookie };
   });
 }

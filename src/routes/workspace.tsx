@@ -1,22 +1,12 @@
-import { useState, type FormEvent } from "react";
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { Copy, KeyRound, Trash2 } from "lucide-react";
-import {
-  createApp,
-  deleteApp,
-  disconnectAccount,
-  fetchSession,
-  fetchWorkspace,
-  revokeApp,
-  rotateAppSecret,
-  updateApp,
-} from "@/lib/api";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { disconnectAccount, fetchSession, fetchWorkspace, revokeApp } from "@/lib/api";
 import { platformLabel } from "@/lib/platforms";
 import { PlatformIcon } from "@/components/marks";
 import { ErrorNote, Page } from "@/components/shell";
 import { useSession } from "@/lib/session";
 import { PlatformButtons } from "@/components/platform-buttons";
-import type { DeveloperAppView, WorkspaceView } from "@/server/workspace";
+import type { WorkspaceView } from "@/server/workspace";
+import { useAction } from "@/lib/use-action";
 
 export const Route = createFileRoute("/workspace")({
   head: () => ({ meta: [{ title: "Workspace · Identity Hub" }] }),
@@ -30,27 +20,6 @@ export const Route = createFileRoute("/workspace")({
   loader: () => fetchWorkspace(),
   component: Workspace,
 });
-
-type Outcome = { ok: true } | { ok: false; error: string };
-
-/** Run a mutation, refresh the page data, and surface any error. */
-function useAction() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const run = async <T extends Outcome>(work: () => Promise<T>): Promise<T | null> => {
-    setError(null);
-    try {
-      const result = await work();
-      if (!result.ok) setError(result.error);
-      await router.invalidate();
-      return result;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong.");
-      return null;
-    }
-  };
-  return { error, run };
-}
 
 function Section({
   title,
@@ -74,7 +43,7 @@ function Workspace() {
   const workspace = Route.useLoaderData();
   const { error: flowError } = Route.useSearch();
   const { error, run } = useAction();
-  const { platforms } = useSession();
+  const { methods } = useSession();
   return (
     <Page>
       <div className="flex items-center gap-3">
@@ -123,7 +92,7 @@ function Workspace() {
         </ul>
         <div className="mt-5">
           <PlatformButtons
-            platforms={platforms}
+            platforms={methods}
             intent="connect"
             returnTo="/workspace"
             verb="Connect"
@@ -143,9 +112,14 @@ function Workspace() {
 
       <Section
         title="Your apps"
-        description="Register a product to let people sign in with Identity Hub and grant it accounts."
+        description="Register a product, choose its sign-in methods and copy its sign-in widget."
       >
-        <DeveloperApps apps={workspace.developerApps} />
+        <Link
+          to="/apps"
+          className="inline-flex min-h-11 items-center rounded-full bg-bg-alt px-4 text-sm font-semibold text-fg no-underline"
+        >
+          Manage apps and widgets
+        </Link>
       </Section>
 
       <Section title="Activity">
@@ -218,218 +192,5 @@ function AuthorizedApps({
         </li>
       ))}
     </ul>
-  );
-}
-
-function SecretNotice({
-  clientId,
-  secret,
-  onDone,
-}: {
-  clientId: string;
-  secret: string;
-  onDone: () => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-ok bg-ok-soft p-4 text-sm">
-      <p className="font-semibold">Copy the client secret now. It is not shown again.</p>
-      <dl className="mt-3 grid gap-2">
-        <div>
-          <dt className="text-muted">client_id</dt>
-          <dd className="break-all">{clientId}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">client_secret</dt>
-          <dd className="flex items-center gap-2 break-all">
-            {secret}
-            <button
-              type="button"
-              aria-label="Copy secret"
-              className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-bg"
-              onClick={() => navigator.clipboard.writeText(secret)}
-            >
-              <Copy className="size-4" aria-hidden="true" />
-            </button>
-          </dd>
-        </div>
-      </dl>
-      <button
-        type="button"
-        className="mt-3 min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink"
-        onClick={onDone}
-      >
-        I saved it
-      </button>
-    </div>
-  );
-}
-
-function AppForm({
-  app,
-  onSaved,
-}: {
-  app?: DeveloperAppView;
-  onSaved: (result: { clientId: string; clientSecret: string } | null) => void;
-}) {
-  const { error, run } = useAction();
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const fields = {
-      name: String(form.get("name") ?? ""),
-      homepageUrl: String(form.get("homepageUrl") ?? ""),
-      redirectUris: String(form.get("redirectUris") ?? "")
-        .split(/\s+/)
-        .filter(Boolean),
-    };
-    if (app) {
-      const result = await run(() => updateApp({ data: { ...fields, appId: app.id } }));
-      if (result?.ok) onSaved(null);
-    } else {
-      const result = await run(() => createApp({ data: fields }));
-      if (result?.ok) onSaved({ clientId: result.clientId, clientSecret: result.clientSecret });
-    }
-  };
-  const input = "mt-1 w-full min-h-11 rounded-xl border border-line bg-bg px-3";
-  return (
-    <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-line p-4">
-      <label className="text-sm font-medium">
-        Name
-        <input
-          name="name"
-          required
-          defaultValue={app?.name}
-          className={input}
-          placeholder="SocialPostAPI"
-        />
-      </label>
-      <label className="text-sm font-medium">
-        Homepage URL
-        <input
-          name="homepageUrl"
-          type="url"
-          required
-          defaultValue={app?.homepageUrl}
-          className={input}
-          placeholder="https://socialpostapi.makketing.com"
-        />
-      </label>
-      <label className="text-sm font-medium">
-        Redirect URIs, one per line
-        <textarea
-          name="redirectUris"
-          required
-          rows={3}
-          defaultValue={app?.redirectUris.join("\n")}
-          className={`${input} py-2`}
-          placeholder="https://socialpostapi.makketing.com/auth/identityhub/callback"
-        />
-      </label>
-      <button
-        type="submit"
-        className="min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink"
-      >
-        {app ? "Save" : "Register app"}
-      </button>
-      <ErrorNote message={error} />
-    </form>
-  );
-}
-
-function DeveloperApps({ apps }: { apps: DeveloperAppView[] }) {
-  const { error, run } = useAction();
-  const [secret, setSecret] = useState<{ clientId: string; clientSecret: string } | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  return (
-    <div className="grid gap-3">
-      {secret ? (
-        <SecretNotice
-          clientId={secret.clientId}
-          secret={secret.clientSecret}
-          onDone={() => setSecret(null)}
-        />
-      ) : null}
-      <ErrorNote message={error} />
-      {apps.map((app) =>
-        editing === app.id ? (
-          <AppForm key={app.id} app={app} onSaved={() => setEditing(null)} />
-        ) : (
-          <div key={app.id} className="rounded-2xl border border-line p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold">{app.name}</p>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  className="min-h-11 rounded-full px-3 text-sm font-medium hover:bg-bg-alt"
-                  onClick={() => setEditing(app.id)}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium hover:bg-bg-alt"
-                  onClick={async () => {
-                    if (
-                      !confirm(
-                        `Rotate ${app.name}'s client secret? The old one stops working immediately.`,
-                      )
-                    )
-                      return;
-                    const result = await run(() => rotateAppSecret({ data: { appId: app.id } }));
-                    if (result?.ok)
-                      setSecret({ clientId: app.clientId, clientSecret: result.clientSecret });
-                  }}
-                >
-                  <KeyRound className="size-4" aria-hidden="true" />
-                  New secret
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-danger hover:bg-danger-soft"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Delete ${app.name}? Everyone's grants and tokens for it are removed.`,
-                      )
-                    )
-                      void run(() => deleteApp({ data: { appId: app.id } }));
-                  }}
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  Delete
-                </button>
-              </div>
-            </div>
-            <dl className="mt-2 grid gap-1 text-sm">
-              <div className="flex flex-wrap gap-x-2">
-                <dt className="text-muted">client_id</dt>
-                <dd className="break-all">{app.clientId}</dd>
-              </div>
-              <div className="flex flex-wrap gap-x-2">
-                <dt className="text-muted">Redirect URIs</dt>
-                <dd className="break-all">{app.redirectUris.join(", ")}</dd>
-              </div>
-            </dl>
-          </div>
-        ),
-      )}
-      {creating ? (
-        <AppForm
-          onSaved={(created) => {
-            setCreating(false);
-            if (created) setSecret(created);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          className="min-h-11 justify-self-start rounded-full bg-bg-alt px-4 text-sm font-semibold"
-          onClick={() => setCreating(true)}
-        >
-          Register an app
-        </button>
-      )}
-    </div>
   );
 }

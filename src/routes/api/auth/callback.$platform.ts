@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/auth/callback/$platform")({
       GET: async ({ request, params }) => {
         const { finishAuthorization } = await import("@/server/oauth");
         const { redirect } = await import("@/server/http");
-        const result = await finishAuthorization(params.platform, request.url);
+        const result = await finishAuthorization(params.platform, request);
         return redirect(result.location, result.setCookie);
       },
     },

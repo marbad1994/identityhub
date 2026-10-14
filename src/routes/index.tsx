@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
 const steps = [
   [
     "Sign in",
-    "Log in with X, Instagram, Facebook, TikTok, LinkedIn, YouTube, Reddit or Snapchat. No new password.",
+    "Log in with X, Instagram, Facebook, TikTok, LinkedIn, YouTube, Reddit or Snapchat, or with an email and password.",
   ],
   ["Connect", "Add the other accounts you publish to. Tokens are encrypted and stay on the hub."],
   [
@@ -32,7 +32,7 @@ function Home() {
         </h1>
         <p className="mt-5 max-w-xl text-lg text-muted">
           Identity Hub signs you in to every Makketing product with the social accounts you already
-          have, and lets you decide which of them each product is allowed to use.
+          have or an email and password, and lets you decide which accounts each product may use.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link

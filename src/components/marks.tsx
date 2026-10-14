@@ -1,4 +1,4 @@
-import { Ghost } from "lucide-react";
+import { Ghost, Mail } from "lucide-react";
 
 export function Mark({ className }: { className?: string }) {
   return (
@@ -29,6 +29,7 @@ const paths: Record<string, string> = {
 
 export function PlatformIcon({ id, className }: { id: string; className?: string }) {
   // Snapchat has no path here; Lucide's ghost stands in for its mark.
+  if (id === "password" || id === "mail") return <Mail className={className} aria-hidden="true" />;
   if (!paths[id]) return <Ghost className={className} aria-hidden="true" />;
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
