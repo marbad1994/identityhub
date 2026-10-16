@@ -5,7 +5,9 @@
 #   bash /opt/identityhub/scripts/deploy-server.sh [hub origin]
 #
 # 1. Turns on SocialPostAPI's callback forwarding (IDENTITY_HUB_URL) and
-#    recreates its containers so they read it.
+#    deploys SocialPostAPI's latest main with its own scripts/deploy.sh
+#    (backup, migrate, health check, rollback), or just recreates its
+#    containers when it is already current.
 # 2. Fills /opt/identityhub/.env from SocialPostAPI's .env, pulls the image
 #    and starts the hub, then waits for its health check.
 # 3. Adds the hub's hostname to Makketing's Caddyfile and reloads Caddy.
@@ -31,11 +33,15 @@ if grep -q '^IDENTITY_HUB_URL=' "$SPA_DIR/.env"; then
 else
   printf '\nIDENTITY_HUB_URL=%s\n' "$HUB_ORIGIN" >>"$SPA_DIR/.env"
 fi
-if grep -q 'IDENTITY_HUB_STATE_PREFIX' "$SPA_DIR/app/api/v1/connect.py" 2>/dev/null; then
-  # Recreate only what reads .env; replica counts come from .env too.
-  (cd "$SPA_DIR" && docker compose up -d --no-build api worker)
+(cd "$SPA_DIR" && git fetch --quiet origin main)
+if (cd "$SPA_DIR" && git merge-base --is-ancestor HEAD origin/main && [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]); then
+  # Behind main (which carries the forwarding): use SocialPostAPI's own deploy,
+  # which backs up Postgres, migrates, restarts and rolls back if unhealthy.
+  log "Deploying SocialPostAPI $(cd "$SPA_DIR" && git rev-parse --short origin/main)"
+  (cd "$SPA_DIR" && sh scripts/deploy.sh "$(git rev-parse origin/main)" "$SPA_DIR")
 else
-  warn "This SocialPostAPI checkout predates callback forwarding. Wait for its GitHub deploy to finish, then run this script again."
+  # Up to date: recreate only what reads .env so it picks up IDENTITY_HUB_URL.
+  (cd "$SPA_DIR" && docker compose up -d --no-build api worker)
 fi
 
 # --- Identity Hub -------------------------------------------------------------
