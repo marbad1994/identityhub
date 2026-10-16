@@ -18,7 +18,7 @@ RUN echo '{"type":"module","private":true}' > package.json \
     && npm cache clean --force
 COPY --from=build /app/.output ./.output
 COPY migrations ./migrations
-COPY scripts/migrate.mjs scripts/migration-plan.mjs ./scripts/
+COPY scripts/migrate.mjs scripts/migration-plan.mjs scripts/check-callback-forwarding.mjs ./scripts/
 COPY docker-entrypoint.sh ./
 USER node
 EXPOSE 8080

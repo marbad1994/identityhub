@@ -1,0 +1,84 @@
+diff --git a/app/api/v1/connect.py b/app/api/v1/connect.py
+--- a/app/api/v1/connect.py
++++ b/app/api/v1/connect.py
+@@ -1,8 +1,9 @@
+ from __future__ import annotations
+ 
++import re
+ from urllib.parse import urlencode
+ 
+-from fastapi import APIRouter, Depends, Query
++from fastapi import APIRouter, Depends, Query, Request
+ from fastapi.responses import RedirectResponse
+ from sqlalchemy.ext.asyncio import AsyncSession
+ 
+@@ -16,6 +17,11 @@
+ router = APIRouter(prefix="/api/connect", tags=["connect"])
+ settings = get_settings()
+ 
++# Identity Hub marks its OAuth states with this prefix. This service never
++# issues it (its own states are random token_urlsafe values), so a callback
++# carrying it belongs to the hub.
++IDENTITY_HUB_STATE_PREFIX = "ihub_st_"
++
+ 
+ @router.get("/{platform}/start")
+ async def start_connect(
+@@ -33,13 +39,17 @@ async def start_connect(
+ 
+ @router.get("/{platform}/callback")
+ async def connect_callback(
++    request: Request,
+     platform: str,
+     code: str | None = Query(default=None),
+     state: str | None = Query(default=None),
+     error: str | None = Query(default=None),
+     error_description: str | None = Query(default=None),
+     db: AsyncSession = Depends(get_db),
+ ):
++    hub = _identity_hub_forward(request, platform, state)
++    if hub is not None:
++        return hub
+     if error:
+         return _finish(platform, ok=False, message=error_description or error)
+     if not code or not state:
+@@ -53,6 +63,22 @@ async def connect_callback(
+     return _finish(platform, ok=True, profile_ids=[p.id for p in profiles])
+ 
+ 
++def _identity_hub_forward(request: Request, platform: str, state: str | None) -> RedirectResponse | None:
++    """Send an Identity Hub callback, unchanged, to the hub's own callback.
++
++    The hub exchanges the code itself with this same redirect URI, so the
++    platform's exact-match check still passes. The target is fixed by
++    configuration and the platform segment is restricted to a plain id, so
++    this cannot be turned into an open redirect.
++    """
++    if not settings.IDENTITY_HUB_URL or not state or not state.startswith(IDENTITY_HUB_STATE_PREFIX):
++        return None
++    if not re.fullmatch(r"[a-z]{1,20}", platform):
++        return None
++    target = f"{settings.IDENTITY_HUB_URL.rstrip('/')}/api/auth/callback/{platform}"
++    return RedirectResponse(f"{target}?{request.url.query}", status_code=302)
++
++
+ def _finish(platform: str, *, ok: bool, message: str = "", profile_ids: list[str] | None = None):
+     """Either redirect to the tenant's own success page (if BASE_URL points
+     at one) or return JSON directly — useful when this API is called from
+diff --git a/app/config.py b/app/config.py
+--- a/app/config.py
++++ b/app/config.py
+@@ -252,6 +252,12 @@ def _validate_session_secret(cls, v: SecretStr) -> SecretStr:
+     # Base URL for callbacks
+     BASE_URL: str = "http://localhost:8237"
+ 
++    # Identity Hub (e.g. https://identity.makketing.com) reuses this service's
++    # registered /api/connect/{platform}/callback redirect URIs instead of
++    # registering its own on every platform. Callbacks whose state carries the
++    # hub's prefix are forwarded there; unset means nothing is forwarded.
++    IDENTITY_HUB_URL: str | None = None
++
+     # Stripe (self-serve billing). Unset SECRET/WEBHOOK_SECRET fails the
+     # relevant routes closed rather than silently accepting unsigned
+     # webhooks or calling Stripe with no key. Price IDs are created once in
+

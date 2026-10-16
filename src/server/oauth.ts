@@ -163,8 +163,9 @@ export async function finishAuthorization(provider: string, request: Request): P
   }
   const result = await settle(provider, url, pending, request);
   if (!pending.relay_hash) return result;
-  // Signed in from a popup: hand the destination to the opener and let the popup close.
-  await completeRelay(pending.relay_hash, result.location);
+  // The opener may still be on the IP address. The session belongs to APP_ORIGIN,
+  // so a relative destination would send it back to a host with no session cookie.
+  await completeRelay(pending.relay_hash, new URL(result.location, appOrigin()).href);
   return { ...result, relayed: true };
 }
 

@@ -26,16 +26,32 @@ export function openPopup(url: string): Window | null {
  * Poll the relay until the popup finishes. Resolves with the location to go
  * to, or null when cancelled or after 15 minutes.
  */
-export async function waitForRelay(relay: string, signal: AbortSignal): Promise<string | null> {
+export async function waitForRelay(
+  relay: string,
+  signal: AbortSignal,
+  popup?: { window: Pick<Window, "closed">; onUnavailable: () => void },
+): Promise<string | null> {
   const deadline = Date.now() + 15 * 60 * 1000;
+  let closedAt: number | null = null;
+  let notified = false;
   while (!signal.aborted && Date.now() < deadline) {
     try {
       const response = await fetch(`/api/v1/relay/${relay}`, { signal, cache: "no-store" });
       const body = (await response.json()) as { status?: string; location?: string };
+      if (signal.aborted) return null;
       if (body.status === "done" && body.location) return body.location;
     } catch {
       if (signal.aborted) return null;
     }
+    if (popup?.window.closed && !notified) {
+      closedAt ??= Date.now();
+      if (Date.now() - closedAt >= 5000) {
+        notified = true;
+        popup.onUnavailable();
+      }
+    }
+    // A provider's COOP policy can make an open popup appear closed. Allow
+    // retrying, but keep polling so that an in-progress login can still finish.
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return null;

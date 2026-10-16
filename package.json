@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "node --test scripts/migration-plan.test.mjs && node --experimental-strip-types --test src/lib/platforms.test.ts src/server/security.test.ts",
+    "test": "node --test scripts/migration-plan.test.mjs scripts/check-callback-forwarding.test.mjs && node --experimental-strip-types --test src/lib/platforms.test.ts src/lib/popup.test.ts src/server/security.test.ts src/server/auth-origin.test.ts",
     "test:e2e": "node scripts/e2e/run.mjs"
   },
   "dependencies": {

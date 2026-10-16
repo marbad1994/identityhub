@@ -51,6 +51,16 @@ The platform variable names match SocialPostAPI's, so the same developer apps se
 
 **No new redirect URIs needed.** With `PLATFORM_CALLBACK_BASE=https://socialpostapi.makketing.com/api/connect`, the hub sends platforms SocialPostAPI's already-registered callback (`{base}/{platform}/callback`). The hub marks its OAuth states with the prefix `ihub_st_`; SocialPostAPI, with `IDENTITY_HUB_URL` set in its `.env`, forwards those callbacks unchanged to `{APP_ORIGIN}/api/auth/callback/{platform}`, and the hub exchanges the code with the same redirect URI. Without `PLATFORM_CALLBACK_BASE`, register `{APP_ORIGIN}/api/auth/callback/{platform}` on each platform instead. Snapchat is not in SocialPostAPI; register whichever callback the hub uses on its Snap Kit app.
 
+If the popup closes but IdentityHub keeps waiting, check the callback forwarder:
+
+```bash
+docker compose exec -T app node scripts/check-callback-forwarding.mjs
+```
+
+SocialPostAPI must forward both successful and denied sign-ins to the hub, before checking its own OAuth states. If it sends the popup to `/connect/result` with "Invalid or already-used OAuth state", set `IDENTITY_HUB_URL` in SocialPostAPI's `.env` to the exact same URL as IdentityHub's `APP_ORIGIN`, deploy SocialPostAPI's version with hub forwarding, and recreate its API containers (`docker compose up -d --no-build --force-recreate api` from its directory). Restarting an existing container does not load changed environment variables. `scripts/deploy-server.sh` configures forwarding and now checks it before reporting success.
+
+The deploy script applies only the forwarding changes from SocialPostAPI commit `4257beb` to `app/api/v1/connect.py` and `app/config.py` when needed. It checks the patch before writing, backs up both original files, validates the Python source, and preserves existing server edits and the checked-out commit. Conflicting edits stop the patch without modifying either file. It then builds the image when forwarding is missing from the running API, validates it, and recreates the API.
+
 Use `{APP_ORIGIN}/deletion` as the data deletion URL and `{APP_ORIGIN}/privacy` as the privacy policy URL in each platform's app settings.
 
 ## Security
@@ -73,7 +83,7 @@ The image is published to `ghcr.io/marbad1994/identityhub` by `.github/workflows
 
 `docker-compose.yml` runs the hub and its own Postgres as the isolated project `identityhub`: its own network, volume and container names, and nothing on ports 80/443, so it does not touch other stacks on the host. The app listens on port 8316 on every interface, so it answers both at `http://<server-ip>:8316` and through the reverse proxy on its domain; set `IDENTITYHUB_BIND=127.0.0.1` to keep it proxy-only.
 
-On the IP address, pages and the app API (`/api/v1/*`) work directly. Signing in always finishes on `APP_ORIGIN`: platforms only redirect to the registered https callback, and the session cookie is `Secure` when `APP_ORIGIN` is https, so a browser keeps it only on the domain. The container applies pending migrations on start.
+On the IP address, public pages and the app API (`/api/v1/*`) work directly. Sign-in and account pages automatically redirect to `APP_ORIGIN`, preserving the path and query parameters: the session cookie belongs to that host and is `Secure` when `APP_ORIGIN` is https. Popup completion also sends the opener to an absolute URL on `APP_ORIGIN`, including when the opener is an older IP-address login page. The container applies pending migrations on start.
 
 On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`, image, Caddy route, checks) and is safe to re-run:
 
@@ -82,7 +92,21 @@ On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`
 bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.makketing.com
 ```
 
-No DNS record yet? Deploy on a temporary name that sslip.io resolves to the server's IP, then re-run with the real domain once its A record exists (everyone is signed out and the widget snippet's script URL changes; accounts and apps are kept):
+The A record is in place and the hub is still being served from the IP address. On the server, with this checkout's commit and a clean copy of the domain files, run:
+
+```bash
+python3 /opt/identityhub/scripts/migrate-domain.py
+```
+
+The script applies `scripts/patches/identityhub-domain.patch` in the working tree without moving HEAD, builds the hub image, adds the Caddy site, waits for the certificate, then sets IdentityHub's `APP_ORIGIN` and SocialPostAPI's `IDENTITY_HUB_URL` to `https://identityhub.makketing.com`. SMTP settings and encryption keys are left as they are. A failed step restores the files it changed. Check the helper with `python3 -m unittest discover -s scripts -p test_migrate_domain.py`.
+
+No DNS record yet? Use the IP address directly. This sets both IdentityHub's `APP_ORIGIN` and SocialPostAPI's `IDENTITY_HUB_URL` to the same HTTP origin, skips DNS/Caddy setup, and rebuilds SocialPostAPI's API image if it lacks callback forwarding:
+
+```bash
+bash /opt/identityhub/scripts/deploy-server.sh http://84.247.181.21:8316
+```
+
+Alternatively, deploy on a temporary HTTPS name that sslip.io resolves to the server's IP, then re-run with the real domain once its A record exists (everyone is signed out and the widget snippet's script URL changes; accounts and apps are kept):
 
 ```bash
 bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.84-247-181-21.sslip.io
@@ -98,6 +122,8 @@ docker compose pull && docker compose up -d
 ```
 
 `scripts/env-from-socialpostapi.sh` copies the platform credentials from SocialPostAPI's `.env` on the same host, generates `POSTGRES_PASSWORD` and `TOKEN_ENCRYPTION_KEY`, never overwrites a value that is already set, and prints names only.
+
+For the existing `admin@makketing.com` Zoho EU mailbox, run `python3 scripts/configure-zoho-smtp.py` on the server. It prompts for the app password without echoing, checks SMTP authentication at `smtppro.zoho.eu:465` without sending mail, backs up `/opt/identityhub/.env`, and updates only SMTP settings. Recreate the hub with `docker compose up -d --no-deps --force-recreate app` afterward. Test the helper locally with `python3 -m unittest discover -s scripts -p test_configure_zoho_smtp.py`.
 
 Route a hostname to it from the host's existing reverse proxy, for example Makketing's Caddy:
 

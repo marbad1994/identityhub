@@ -1,4 +1,6 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
+import { canonicalAuthUrl } from "./server/auth-origin";
+import { appOrigin } from "./server/env";
 
 /** Public endpoints other sites load (the widget's config); they need CORS and cross-origin CORP. */
 const isPublicApi = (pathname: string) =>
@@ -10,6 +12,13 @@ const isPublicApi = (pathname: string) =>
  * context, so every inline script the framework writes carries it.
  */
 const securityHeaders = createMiddleware().server(async ({ next, request }) => {
+  const canonical = canonicalAuthUrl(request, appOrigin());
+  if (canonical) {
+    return new Response(null, {
+      status: 302,
+      headers: { location: canonical, "cache-control": "no-store" },
+    });
+  }
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
   const result = await next({ context: { nonce } });
   const headers = result.response.headers;

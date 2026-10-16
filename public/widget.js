@@ -234,6 +234,9 @@
         return response.json();
       })
       .then(function (config) {
+        // A previously copied IP-address snippet should open authentication
+        // on the configured host, which owns the hub's session cookie.
+        if (config.hub_origin) options.hub = new URL(config.hub_origin).origin;
         if (!options.redirectUri) options.redirectUri = config.redirect_uris[0];
         render(root, config, options);
       })

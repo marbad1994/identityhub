@@ -1,0 +1,986 @@
+diff --git a/.gitignore b/.gitignore
+index f1a2775..9d86759 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,5 @@
+ node_modules
++__pycache__/
+ .vercel
+ .tanstack
+ screenshots
+diff --git a/Dockerfile b/Dockerfile
+index 8bc39ac..036207e 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -18,7 +18,7 @@ RUN echo '{"type":"module","private":true}' > package.json \
+     && npm cache clean --force
+ COPY --from=build /app/.output ./.output
+ COPY migrations ./migrations
+-COPY scripts/migrate.mjs scripts/migration-plan.mjs ./scripts/
++COPY scripts/migrate.mjs scripts/migration-plan.mjs scripts/check-callback-forwarding.mjs ./scripts/
+ COPY docker-entrypoint.sh ./
+ USER node
+ EXPOSE 8080
+diff --git a/README.md b/README.md
+index 6a49faf..a276cd5 100644
+--- a/README.md
++++ b/README.md
+@@ -51,6 +51,16 @@ The platform variable names match SocialPostAPI's, so the same developer apps se
+ 
+ **No new redirect URIs needed.** With `PLATFORM_CALLBACK_BASE=https://socialpostapi.makketing.com/api/connect`, the hub sends platforms SocialPostAPI's already-registered callback (`{base}/{platform}/callback`). The hub marks its OAuth states with the prefix `ihub_st_`; SocialPostAPI, with `IDENTITY_HUB_URL` set in its `.env`, forwards those callbacks unchanged to `{APP_ORIGIN}/api/auth/callback/{platform}`, and the hub exchanges the code with the same redirect URI. Without `PLATFORM_CALLBACK_BASE`, register `{APP_ORIGIN}/api/auth/callback/{platform}` on each platform instead. Snapchat is not in SocialPostAPI; register whichever callback the hub uses on its Snap Kit app.
+ 
++If the popup closes but IdentityHub keeps waiting, check the callback forwarder:
++
++```bash
++docker compose exec -T app node scripts/check-callback-forwarding.mjs
++```
++
++SocialPostAPI must forward both successful and denied sign-ins to the hub, before checking its own OAuth states. If it sends the popup to `/connect/result` with "Invalid or already-used OAuth state", set `IDENTITY_HUB_URL` in SocialPostAPI's `.env` to the exact same URL as IdentityHub's `APP_ORIGIN`, deploy SocialPostAPI's version with hub forwarding, and recreate its API containers (`docker compose up -d --no-build --force-recreate api` from its directory). Restarting an existing container does not load changed environment variables. `scripts/deploy-server.sh` configures forwarding and now checks it before reporting success.
++
++The deploy script applies only the forwarding changes from SocialPostAPI commit `4257beb` to `app/api/v1/connect.py` and `app/config.py` when needed. It checks the patch before writing, backs up both original files, validates the Python source, and preserves existing server edits and the checked-out commit. Conflicting edits stop the patch without modifying either file. It then builds the image when forwarding is missing from the running API, validates it, and recreates the API.
++
+ Use `{APP_ORIGIN}/deletion` as the data deletion URL and `{APP_ORIGIN}/privacy` as the privacy policy URL in each platform's app settings.
+ 
+ ## Security
+@@ -73,7 +83,7 @@ The image is published to `ghcr.io/marbad1994/identityhub` by `.github/workflows
+ 
+ `docker-compose.yml` runs the hub and its own Postgres as the isolated project `identityhub`: its own network, volume and container names, and nothing on ports 80/443, so it does not touch other stacks on the host. The app listens on port 8316 on every interface, so it answers both at `http://<server-ip>:8316` and through the reverse proxy on its domain; set `IDENTITYHUB_BIND=127.0.0.1` to keep it proxy-only.
+ 
+-On the IP address, pages and the app API (`/api/v1/*`) work directly. Signing in always finishes on `APP_ORIGIN`: platforms only redirect to the registered https callback, and the session cookie is `Secure` when `APP_ORIGIN` is https, so a browser keeps it only on the domain. The container applies pending migrations on start.
++On the IP address, public pages and the app API (`/api/v1/*`) work directly. Sign-in and account pages automatically redirect to `APP_ORIGIN`, preserving the path and query parameters: the session cookie belongs to that host and is `Secure` when `APP_ORIGIN` is https. Popup completion also sends the opener to an absolute URL on `APP_ORIGIN`, including when the opener is an older IP-address login page. The container applies pending migrations on start.
+ 
+ On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`, image, Caddy route, checks) and is safe to re-run:
+ 
+@@ -82,7 +92,21 @@ On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`
+ bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.makketing.com
+ ```
+ 
+-No DNS record yet? Deploy on a temporary name that sslip.io resolves to the server's IP, then re-run with the real domain once its A record exists (everyone is signed out and the widget snippet's script URL changes; accounts and apps are kept):
++The A record is in place and the hub is still being served from the IP address. On the server, with this checkout's commit and a clean copy of the domain files, run:
++
++```bash
++python3 /opt/identityhub/scripts/migrate-domain.py
++```
++
++The script applies `scripts/patches/identityhub-domain.patch` in the working tree without moving HEAD, builds the hub image, adds the Caddy site, waits for the certificate, then sets IdentityHub's `APP_ORIGIN` and SocialPostAPI's `IDENTITY_HUB_URL` to `https://identityhub.makketing.com`. SMTP settings and encryption keys are left as they are. A failed step restores the files it changed. Check the helper with `python3 -m unittest discover -s scripts -p test_migrate_domain.py`.
++
++No DNS record yet? Use the IP address directly. This sets both IdentityHub's `APP_ORIGIN` and SocialPostAPI's `IDENTITY_HUB_URL` to the same HTTP origin, skips DNS/Caddy setup, and rebuilds SocialPostAPI's API image if it lacks callback forwarding:
++
++```bash
++bash /opt/identityhub/scripts/deploy-server.sh http://84.247.181.21:8316
++```
++
++Alternatively, deploy on a temporary HTTPS name that sslip.io resolves to the server's IP, then re-run with the real domain once its A record exists (everyone is signed out and the widget snippet's script URL changes; accounts and apps are kept):
+ 
+ ```bash
+ bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.84-247-181-21.sslip.io
+@@ -99,6 +123,8 @@ docker compose pull && docker compose up -d
+ 
+ `scripts/env-from-socialpostapi.sh` copies the platform credentials from SocialPostAPI's `.env` on the same host, generates `POSTGRES_PASSWORD` and `TOKEN_ENCRYPTION_KEY`, never overwrites a value that is already set, and prints names only.
+ 
++For the existing `admin@makketing.com` Zoho EU mailbox, run `python3 scripts/configure-zoho-smtp.py` on the server. It prompts for the app password without echoing, checks SMTP authentication at `smtppro.zoho.eu:465` without sending mail, backs up `/opt/identityhub/.env`, and updates only SMTP settings. Recreate the hub with `docker compose up -d --no-deps --force-recreate app` afterward. Test the helper locally with `python3 -m unittest discover -s scripts -p test_configure_zoho_smtp.py`.
++
+ Route a hostname to it from the host's existing reverse proxy, for example Makketing's Caddy:
+ 
+ ```text
+diff --git a/package.json b/package.json
+index fb0cbc0..c2cf02b 100644
+--- a/package.json
++++ b/package.json
+@@ -14,7 +14,7 @@
+     "typecheck": "tsc --noEmit",
+     "lint": "eslint .",
+     "format": "prettier --write .",
+-    "test": "node --test scripts/migration-plan.test.mjs && node --experimental-strip-types --test src/lib/platforms.test.ts src/server/security.test.ts",
++    "test": "node --test scripts/migration-plan.test.mjs scripts/check-callback-forwarding.test.mjs && node --experimental-strip-types --test src/lib/platforms.test.ts src/lib/popup.test.ts src/server/security.test.ts src/server/auth-origin.test.ts",
+     "test:e2e": "node scripts/e2e/run.mjs"
+   },
+   "dependencies": {
+diff --git a/public/widget.js b/public/widget.js
+index ff39600..4602de7 100644
+--- a/public/widget.js
++++ b/public/widget.js
+@@ -234,6 +234,9 @@
+         return response.json();
+       })
+       .then(function (config) {
++        // A previously copied IP-address snippet should open authentication
++        // on the configured host, which owns the hub's session cookie.
++        if (config.hub_origin) options.hub = new URL(config.hub_origin).origin;
+         if (!options.redirectUri) options.redirectUri = config.redirect_uris[0];
+         render(root, config, options);
+       })
+diff --git a/scripts/check-callback-forwarding.mjs b/scripts/check-callback-forwarding.mjs
+new file mode 100644
+index 0000000..e435b1d
+--- /dev/null
++++ b/scripts/check-callback-forwarding.mjs
+@@ -0,0 +1,46 @@
++import { pathToFileURL } from "node:url";
++
++/** Probe forwarding without a real authorization code or a user's login. */
++export async function checkCallbackForwarding(origin, callbackBase, fetcher = fetch) {
++  for (const platform of ["twitter", "tiktok"]) {
++    for (const result of [{ code: "identityhub-forwarding-check" }, { error: "access_denied" }]) {
++      const query = new URLSearchParams({ state: "ihub_st_forwarding_check", ...result });
++      const url = `${callbackBase.replace(/\/+$/, "")}/${platform}/callback?${query}`;
++      const response = await fetcher(url, {
++        redirect: "manual",
++        signal: AbortSignal.timeout(15000),
++      });
++      const location = response.headers.get("location");
++      const expected = new URL(`/api/auth/callback/${platform}?${query}`, origin).href;
++      if (
++        ![302, 303, 307, 308].includes(response.status) ||
++        !location ||
++        new URL(location, url).href !== expected
++      ) {
++        throw new Error(
++          `${platform} callback is not forwarding to ${new URL(origin).origin}. ` +
++            "Set IDENTITY_HUB_URL to IdentityHub's APP_ORIGIN in SocialPostAPI's .env, " +
++            "deploy the version with IdentityHub callback forwarding, and recreate its API containers.",
++        );
++      }
++    }
++  }
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
++  const { APP_ORIGIN, PLATFORM_CALLBACK_BASE } = process.env;
++  if (!PLATFORM_CALLBACK_BASE) {
++    console.log("Direct platform callbacks configured; no forwarding needed.");
++  } else if (!APP_ORIGIN) {
++    console.error("APP_ORIGIN must be set.");
++    process.exitCode = 1;
++  } else {
++    try {
++      await checkCallbackForwarding(APP_ORIGIN, PLATFORM_CALLBACK_BASE);
++      console.log("SocialPostAPI forwards IdentityHub callbacks and provider errors correctly.");
++    } catch (error) {
++      console.error(error.message);
++      process.exitCode = 1;
++    }
++  }
++}
+diff --git a/scripts/check-callback-forwarding.test.mjs b/scripts/check-callback-forwarding.test.mjs
+new file mode 100644
+index 0000000..a3c5abc
+--- /dev/null
++++ b/scripts/check-callback-forwarding.test.mjs
+@@ -0,0 +1,58 @@
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { checkCallbackForwarding } from "./check-callback-forwarding.mjs";
++
++const origin = "https://hub.example.com";
++const callbackBase = "https://socialpost.example.com/api/connect";
++
++test("callback check verifies both X and TikTok, including denied consent", async () => {
++  const calls = [];
++  await checkCallbackForwarding(origin, callbackBase, async (input, options) => {
++    calls.push(input);
++    assert.equal(options.redirect, "manual");
++    const url = new URL(input);
++    const platform = url.pathname.split("/")[3];
++    return new Response(null, {
++      status: 302,
++      headers: { location: `${origin}/api/auth/callback/${platform}${url.search}` },
++    });
++  });
++  assert.equal(calls.length, 4);
++});
++
++test("callback check rejects SocialPostAPI's own popup result page", async () => {
++  await assert.rejects(
++    checkCallbackForwarding(
++      origin,
++      callbackBase,
++      async () =>
++        new Response(null, {
++          status: 307,
++          headers: {
++            location:
++              "https://socialpost.example.com/connect/result?ok=0&message=Invalid+or+already-used+OAuth+state",
++          },
++        }),
++    ),
++    /Set IDENTITY_HUB_URL/,
++  );
++});
++
++test("callback check rejects a different hub host or lost query parameters", async () => {
++  for (const location of [
++    "https://other.example.com/api/auth/callback/twitter",
++    `${origin}/api/auth/callback/twitter`,
++  ]) {
++    await assert.rejects(
++      checkCallbackForwarding(
++        origin,
++        callbackBase,
++        async () =>
++          new Response(null, {
++            status: 302,
++            headers: { location },
++          }),
++      ),
++    );
++  }
++});
+diff --git a/scripts/configure-zoho-smtp.py b/scripts/configure-zoho-smtp.py
+new file mode 100644
+index 0000000..6834cf4
+--- /dev/null
++++ b/scripts/configure-zoho-smtp.py
+@@ -0,0 +1,64 @@
++#!/usr/bin/env python3
++"""Configure IdentityHub's existing Zoho EU mailbox without exposing its password."""
++import getpass
++import os
++from pathlib import Path
++import re
++import shutil
++import smtplib
++import ssl
++import tempfile
++import warnings
++
++HOST = "smtppro.zoho.eu"
++MAILBOX = "admin@makketing.com"
++
++
++def verify_smtp(password):
++    # Authenticate only: this does not send an email.
++    with smtplib.SMTP_SSL(HOST, 465, context=ssl.create_default_context(), timeout=20) as smtp:
++        smtp.login(MAILBOX, password)
++
++
++def configure(path, password, verify=verify_smtp):
++    path = Path(path)
++    original = path.read_text()
++    if not password or any(char in password for char in "\r\n\0"):
++        raise ValueError("Enter the Zoho app password without line breaks.")
++    verify(password)
++    values = dict(SMTP_HOST=HOST, SMTP_PORT="465", SMTP_USER=MAILBOX,
++                  SMTP_PASSWORD=password, SMTP_FROM_EMAIL=MAILBOX, SMTP_USE_TLS="true")
++    pattern = re.compile(r"^\s*(?:export\s+)?(?:" + "|".join(values) + r")\s*[=:]")
++    lines = [line for line in original.splitlines() if not pattern.match(line)]
++    # Compose uses single-quoted values literally, including dollar signs.
++    for key, value in values.items():
++        lines.append(key + "='" + value.replace("'", "\\'") + "'")
++    descriptor, backup = tempfile.mkstemp(prefix=path.name + ".before-smtp-", dir=path.parent)
++    os.close(descriptor)
++    shutil.copyfile(path, backup)
++    os.chmod(backup, 0o600)
++    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".smtp-", dir=path.parent)
++    try:
++        with os.fdopen(descriptor, "w", newline="\n") as output:
++            output.write("\n".join(lines) + "\n")
++        os.chmod(temporary, 0o600)
++        os.replace(temporary, path)
++    finally:
++        if os.path.exists(temporary):
++            os.unlink(temporary)
++    return backup
++
++
++if __name__ == "__main__":
++    try:
++        warnings.simplefilter("error", getpass.GetPassWarning)
++        password = getpass.getpass("Zoho app password (hidden): ")
++        backup = configure(Path("/opt/identityhub/.env"), password)
++        print("SMTP authentication passed. SMTP settings saved; backup:", backup)
++    except (EOFError, KeyboardInterrupt):
++        raise SystemExit("Cancelled; SMTP settings were not saved.")
++    except Exception as error:
++        # SMTP response text can contain account details; report only type/code.
++        code = getattr(error, "smtp_code", None)
++        raise SystemExit(f"SMTP setup failed ({type(error).__name__}" +
++                         (f", code {code}" if code else "") + "). Application was not restarted.")
+diff --git a/scripts/deploy-server.sh b/scripts/deploy-server.sh
+index 5693b11..f12bf50 100755
+--- a/scripts/deploy-server.sh
++++ b/scripts/deploy-server.sh
+@@ -9,10 +9,9 @@
+ # domain once its A record exists. Changing the address signs everyone out
+ # and changes the widget snippet's script URL; accounts and apps are kept.
+ #
+-# 1. Turns on SocialPostAPI's callback forwarding (IDENTITY_HUB_URL) and
+-#    deploys SocialPostAPI's latest main with its own scripts/deploy.sh
+-#    (backup, migrate, health check, rollback), or just recreates its
+-#    containers when it is already current.
++# 1. Turns on SocialPostAPI's callback forwarding (IDENTITY_HUB_URL), applies
++#    the targeted upstream patch if needed, and rebuilds/recreates its API.
++#    Existing server edits and the checked-out commit are preserved.
+ # 2. Fills /opt/identityhub/.env from SocialPostAPI's .env, pulls the image
+ #    and starts the hub, then waits for its health check.
+ # 3. Adds the hub's hostname to Makketing's Caddyfile and reloads Caddy.
+@@ -20,7 +19,12 @@
+ set -euo pipefail
+ 
+ HUB_ORIGIN="${1:-https://identityhub.makketing.com}"
+-HUB_HOST="${HUB_ORIGIN#https://}"
++HUB_ORIGIN="${HUB_ORIGIN%/}"
++if ! [[ "$HUB_ORIGIN" =~ ^https?://[^/?#@[:space:]]+$ ]]; then
++  echo "Expected a public origin, e.g. http://84.247.181.21:8316 or https://identityhub.makketing.com" >&2
++  exit 1
++fi
++HUB_HOST="${HUB_ORIGIN#*://}"
+ HUB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ 
+ log() { printf '\n==> %s\n' "$*"; }
+@@ -38,16 +42,16 @@ if grep -q '^IDENTITY_HUB_URL=' "$SPA_DIR/.env"; then
+ else
+   printf '\nIDENTITY_HUB_URL=%s\n' "$HUB_ORIGIN" >>"$SPA_DIR/.env"
+ fi
+-(cd "$SPA_DIR" && git fetch --quiet origin main)
+-if (cd "$SPA_DIR" && git merge-base --is-ancestor HEAD origin/main && [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]); then
+-  # Behind main (which carries the forwarding): use SocialPostAPI's own deploy,
+-  # which backs up Postgres, migrates, restarts and rolls back if unhealthy.
+-  log "Deploying SocialPostAPI $(cd "$SPA_DIR" && git rev-parse --short origin/main)"
+-  (cd "$SPA_DIR" && sh scripts/deploy.sh "$(git rev-parse origin/main)" "$SPA_DIR")
+-else
+-  # Up to date: recreate only what reads .env so it picks up IDENTITY_HUB_URL.
+-  (cd "$SPA_DIR" && docker compose up -d --no-build api worker)
++bash "$HUB_DIR/scripts/patch-socialpostapi-forwarding.sh" "$SPA_DIR"
++if ! (cd "$SPA_DIR" && docker compose exec -T --index 1 api python -c \
++  'from app.api.v1.connect import _identity_hub_forward' >/dev/null 2>&1); then
++  log "Rebuilding SocialPostAPI's API image with callback forwarding"
++  (cd "$SPA_DIR" && docker compose build api)
+ fi
++# Validate the image and its configuration before replacing the running API.
++(cd "$SPA_DIR" && docker compose run --rm --no-deps api python -c \
++  'import os; from app.api.v1.connect import _identity_hub_forward, settings; assert settings.IDENTITY_HUB_URL == os.environ["IDENTITY_HUB_URL"], "Forwarding URL was not loaded"')
++(cd "$SPA_DIR" && docker compose up -d --no-build --no-deps --force-recreate api)
+ 
+ # --- Identity Hub -------------------------------------------------------------
+ log "Identity Hub at $HUB_DIR"
+@@ -74,30 +78,37 @@ done
+ curl -fsS http://127.0.0.1:8316/api/health >/dev/null || { warn "The hub did not become healthy. See: docker compose -f $HUB_DIR/docker-compose.yml logs app"; exit 1; }
+ 
+ # --- Caddy (Makketing's reverse proxy owns 80/443) -------------------------------
+-CADDYFILE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' makketing-caddy 2>/dev/null || true)"
+-if [ -z "$CADDYFILE" ]; then
+-  warn "Container makketing-caddy not found: add this to your reverse proxy by hand:"
+-  printf '%s {\n\treverse_proxy host.docker.internal:8316\n}\n' "$HUB_HOST"
+-else
+-  if grep -q "^$HUB_HOST" "$CADDYFILE"; then
+-    log "Caddy already routes $HUB_HOST"
++if [[ "$HUB_ORIGIN" == https://* ]]; then
++  CADDYFILE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' makketing-caddy 2>/dev/null || true)"
++  if [ -z "$CADDYFILE" ]; then
++    warn "Container makketing-caddy not found: add this to your reverse proxy by hand:"
++    printf '%s {\n\treverse_proxy host.docker.internal:8316\n}\n' "$HUB_HOST"
+   else
+-    log "Adding $HUB_HOST to $CADDYFILE"
+-    cp "$CADDYFILE" "$CADDYFILE.bak.$(date +%s)"
+-    printf '\n# Identity Hub (separate compose project, /opt/identityhub)\n%s {\n\treverse_proxy host.docker.internal:8316\n}\n' "$HUB_HOST" >>"$CADDYFILE"
++    if grep -q "^$HUB_HOST" "$CADDYFILE"; then
++      log "Caddy already routes $HUB_HOST"
++    else
++      log "Adding $HUB_HOST to $CADDYFILE"
++      cp "$CADDYFILE" "$CADDYFILE.bak.$(date +%s)"
++      printf '\n# Identity Hub (separate compose project, /opt/identityhub)\n%s {\n\treverse_proxy host.docker.internal:8316\n}\n' "$HUB_HOST" >>"$CADDYFILE"
++    fi
++    docker exec makketing-caddy caddy validate --config /etc/caddy/Caddyfile >/dev/null
++    docker exec makketing-caddy caddy reload --config /etc/caddy/Caddyfile
+   fi
+-  docker exec makketing-caddy caddy validate --config /etc/caddy/Caddyfile >/dev/null
+-  docker exec makketing-caddy caddy reload --config /etc/caddy/Caddyfile
++else
++  log "Using the direct HTTP address $HUB_ORIGIN; no DNS or Caddy route needed"
+ fi
+ 
+ # --- Checks ---------------------------------------------------------------------
+ log "Checks"
+-SERVER_IP="$(curl -fsS https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+-DNS_IP="$(getent ahostsv4 "$HUB_HOST" | awk 'NR==1{print $1}' || true)"
+-if [ "$DNS_IP" = "$SERVER_IP" ]; then
+-  echo "DNS: $HUB_HOST -> $DNS_IP (this server)"
+-else
+-  warn "DNS: $HUB_HOST resolves to '${DNS_IP:-nothing}', expected $SERVER_IP. Add an A record, then Caddy fetches the certificate by itself."
++docker compose exec -T app node scripts/check-callback-forwarding.mjs
++if [[ "$HUB_ORIGIN" == https://* ]]; then
++  SERVER_IP="$(curl -fsS https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
++  DNS_IP="$(getent ahostsv4 "$HUB_HOST" | awk 'NR==1{print $1}' || true)"
++  if [ "$DNS_IP" = "$SERVER_IP" ]; then
++    echo "DNS: $HUB_HOST -> $DNS_IP (this server)"
++  else
++    warn "DNS: $HUB_HOST resolves to '${DNS_IP:-nothing}', expected $SERVER_IP. Add an A record, then Caddy fetches the certificate by itself."
++  fi
+ fi
+ echo "Local:  $(curl -fsS http://127.0.0.1:8316/api/health)"
+ echo "Public: $(curl -fsS --max-time 15 "$HUB_ORIGIN/api/health" 2>/dev/null || echo 'not reachable yet (DNS or certificate pending)')"
+diff --git a/scripts/patch-socialpostapi-forwarding.sh b/scripts/patch-socialpostapi-forwarding.sh
+new file mode 100644
+index 0000000..9bc1574
+--- /dev/null
++++ b/scripts/patch-socialpostapi-forwarding.sh
+@@ -0,0 +1,64 @@
++#!/usr/bin/env bash
++# Apply only the forwarding changes from SocialPostAPI commit 4257beb, keeping server edits.
++set -euo pipefail
++SPA_DIR="${1:?usage: patch-socialpostapi-forwarding.sh /path/to/SocialPostAPI}"
++UPSTREAM_PATCH="$(cd "$(dirname "$0")" && pwd)/patches/socialpostapi-forwarding.patch"
++
++if grep -q 'def _identity_hub_forward' "$SPA_DIR/app/api/v1/connect.py" &&
++  grep -q 'IDENTITY_HUB_URL:' "$SPA_DIR/app/config.py"; then
++  echo "SocialPostAPI's source already includes callback forwarding."
++  exit 0
++fi
++command -v python3 >/dev/null || { echo "python3 is required to validate the patch." >&2; exit 1; }
++PATCH_FILE="$(mktemp)"
++trap 'rm -f "$PATCH_FILE"' EXIT
++# Preserve the server's extended URL imports and custom ConnectStartResponse.
++# Only unchanged context lines are adapted; the upstream additions stay intact.
++python3 - "$SPA_DIR/app/api/v1/connect.py" "$UPSTREAM_PATCH" "$PATCH_FILE" <<'PY'
++from pathlib import Path
++import sys
++
++source = Path(sys.argv[1]).read_text().splitlines()
++patch = Path(sys.argv[2]).read_text()
++for context, prefix in [
++    ("from urllib.parse import urlencode", "from urllib.parse import "),
++    ('@router.get("/{platform}/start")', '@router.get("/{platform}/start"'),
++]:
++    matches = [line for line in source if line.startswith(prefix)]
++    if len(matches) != 1:
++        raise SystemExit(f"Expected one source line starting with {prefix!r}; no files changed.")
++    patch = patch.replace("\n " + context + "\n", "\n " + matches[0] + "\n")
++Path(sys.argv[3]).write_text(patch, newline="\n")
++PY
++
++# git apply checks the complete patch before writing; conflicts leave both files untouched.
++git -C "$SPA_DIR" apply --check "$PATCH_FILE"
++BACKUP_DIR="$(mktemp -d "$SPA_DIR/.identityhub-forwarding-backup.XXXXXX")"
++cp -p "$SPA_DIR/app/api/v1/connect.py" "$BACKUP_DIR/connect.py"
++cp -p "$SPA_DIR/app/config.py" "$BACKUP_DIR/config.py"
++git -C "$SPA_DIR" apply "$PATCH_FILE"
++
++if ! python3 - "$SPA_DIR/app/api/v1/connect.py" "$SPA_DIR/app/config.py" <<'PY'
++import ast
++import pathlib
++import sys
++
++for name in sys.argv[1:]:
++    source = pathlib.Path(name).read_text()
++    compile(source, name, "exec")
++    tree = ast.parse(source)
++    if name.endswith("connect.py"):
++        helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_identity_hub_forward")
++        callback = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "connect_callback")
++        assert "request" in [arg.arg for arg in callback.args.args]
++        assert isinstance(callback.body[0], ast.Assign)
++        assert isinstance(callback.body[0].value, ast.Call)
++        assert callback.body[0].value.func.id == helper.name
++PY
++then
++  cp -p "$BACKUP_DIR/connect.py" "$SPA_DIR/app/api/v1/connect.py"
++  cp -p "$BACKUP_DIR/config.py" "$SPA_DIR/app/config.py"
++  echo "Validation failed; the original server files were restored." >&2
++  exit 1
++fi
++echo "Callback forwarding applied. Original server files saved in $BACKUP_DIR"
+diff --git a/scripts/patches/socialpostapi-forwarding.patch b/scripts/patches/socialpostapi-forwarding.patch
+new file mode 100644
+index 0000000..0d173db
+--- /dev/null
++++ b/scripts/patches/socialpostapi-forwarding.patch
+@@ -0,0 +1,84 @@
++diff --git a/app/api/v1/connect.py b/app/api/v1/connect.py
++--- a/app/api/v1/connect.py
+++++ b/app/api/v1/connect.py
++@@ -1,8 +1,9 @@
++ from __future__ import annotations
++ 
+++import re
++ from urllib.parse import urlencode
++ 
++-from fastapi import APIRouter, Depends, Query
+++from fastapi import APIRouter, Depends, Query, Request
++ from fastapi.responses import RedirectResponse
++ from sqlalchemy.ext.asyncio import AsyncSession
++ 
++@@ -16,6 +17,11 @@
++ router = APIRouter(prefix="/api/connect", tags=["connect"])
++ settings = get_settings()
++ 
+++# Identity Hub marks its OAuth states with this prefix. This service never
+++# issues it (its own states are random token_urlsafe values), so a callback
+++# carrying it belongs to the hub.
+++IDENTITY_HUB_STATE_PREFIX = "ihub_st_"
+++
++ 
++ @router.get("/{platform}/start")
++ async def start_connect(
++@@ -33,13 +39,17 @@ async def start_connect(
++ 
++ @router.get("/{platform}/callback")
++ async def connect_callback(
+++    request: Request,
++     platform: str,
++     code: str | None = Query(default=None),
++     state: str | None = Query(default=None),
++     error: str | None = Query(default=None),
++     error_description: str | None = Query(default=None),
++     db: AsyncSession = Depends(get_db),
++ ):
+++    hub = _identity_hub_forward(request, platform, state)
+++    if hub is not None:
+++        return hub
++     if error:
++         return _finish(platform, ok=False, message=error_description or error)
++     if not code or not state:
++@@ -53,6 +63,22 @@ async def connect_callback(
++     return _finish(platform, ok=True, profile_ids=[p.id for p in profiles])
++ 
++ 
+++def _identity_hub_forward(request: Request, platform: str, state: str | None) -> RedirectResponse | None:
+++    """Send an Identity Hub callback, unchanged, to the hub's own callback.
+++
+++    The hub exchanges the code itself with this same redirect URI, so the
+++    platform's exact-match check still passes. The target is fixed by
+++    configuration and the platform segment is restricted to a plain id, so
+++    this cannot be turned into an open redirect.
+++    """
+++    if not settings.IDENTITY_HUB_URL or not state or not state.startswith(IDENTITY_HUB_STATE_PREFIX):
+++        return None
+++    if not re.fullmatch(r"[a-z]{1,20}", platform):
+++        return None
+++    target = f"{settings.IDENTITY_HUB_URL.rstrip('/')}/api/auth/callback/{platform}"
+++    return RedirectResponse(f"{target}?{request.url.query}", status_code=302)
+++
+++
++ def _finish(platform: str, *, ok: bool, message: str = "", profile_ids: list[str] | None = None):
++     """Either redirect to the tenant's own success page (if BASE_URL points
++     at one) or return JSON directly — useful when this API is called from
++diff --git a/app/config.py b/app/config.py
++--- a/app/config.py
+++++ b/app/config.py
++@@ -252,6 +252,12 @@ def _validate_session_secret(cls, v: SecretStr) -> SecretStr:
++     # Base URL for callbacks
++     BASE_URL: str = "http://localhost:8237"
++ 
+++    # Identity Hub (e.g. https://identity.makketing.com) reuses this service's
+++    # registered /api/connect/{platform}/callback redirect URIs instead of
+++    # registering its own on every platform. Callbacks whose state carries the
+++    # hub's prefix are forwarded there; unset means nothing is forwarded.
+++    IDENTITY_HUB_URL: str | None = None
+++
++     # Stripe (self-serve billing). Unset SECRET/WEBHOOK_SECRET fails the
++     # relevant routes closed rather than silently accepting unsigned
++     # webhooks or calling Stripe with no key. Price IDs are created once in
++
+diff --git a/scripts/test_configure_zoho_smtp.py b/scripts/test_configure_zoho_smtp.py
+new file mode 100644
+index 0000000..243c7f1
+--- /dev/null
++++ b/scripts/test_configure_zoho_smtp.py
+@@ -0,0 +1,60 @@
++import importlib.util
++from pathlib import Path
++import smtplib
++import tempfile
++import unittest
++
++spec = importlib.util.spec_from_file_location("smtp_setup", Path(__file__).with_name("configure-zoho-smtp.py"))
++setup = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(setup)
++
++
++class SmtpSetupTest(unittest.TestCase):
++    def test_preserves_existing_credentials_and_origin_and_backs_up_original(self):
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / ".env"
++            original = ("# Keep production credentials\nTOKEN_ENCRYPTION_KEY=existing-key\n"
++                        "POSTGRES_PASSWORD=existing-db-password\n"
++                        "APP_ORIGIN=http://84.247.181.21:8316\nSMTP_HOST=\n"
++                        "export SMTP_HOST = old.invalid\nSMTP_PASSWORD='old-password'\n")
++            path.write_text(original)
++            calls = []
++            backup = setup.configure(path, "Test$Password'123", calls.append)
++            self.assertEqual(calls, ["Test$Password'123"])
++            self.assertEqual(Path(backup).read_text(), original)
++            result = path.read_text()
++            self.assertIn("TOKEN_ENCRYPTION_KEY=existing-key\n", result)
++            self.assertIn("POSTGRES_PASSWORD=existing-db-password\n", result)
++            self.assertIn("APP_ORIGIN=http://84.247.181.21:8316\n", result)
++            self.assertEqual(result.count("SMTP_HOST="), 1)
++            self.assertNotIn("old.invalid", result)
++            self.assertNotIn("old-password", result)
++            self.assertIn("SMTP_PASSWORD='Test$Password\\'123'\n", result)
++
++    def test_authentication_failure_changes_no_files(self):
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / ".env"
++            path.write_text("APP_ORIGIN=http://84.247.181.21:8316\n")
++            original = path.read_bytes()
++
++            def rejected(_):
++                raise smtplib.SMTPAuthenticationError(535, b"rejected")
++
++            with self.assertRaises(smtplib.SMTPAuthenticationError):
++                setup.configure(path, "TestPassword", rejected)
++            self.assertEqual(path.read_bytes(), original)
++            self.assertEqual(list(Path(directory).iterdir()), [path])
++
++    def test_invalid_password_does_not_attempt_authentication(self):
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / ".env"
++            path.write_text("APP_ORIGIN=http://84.247.181.21:8316\n")
++            calls = []
++            for password in ("", "password\n", "password\0"):
++                with self.assertRaises(ValueError):
++                    setup.configure(path, password, calls.append)
++            self.assertEqual(calls, [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/src/components/platform-buttons.tsx b/src/components/platform-buttons.tsx
+index fcf1fc5..e0db545 100644
+--- a/src/components/platform-buttons.tsx
++++ b/src/components/platform-buttons.tsx
+@@ -1,6 +1,7 @@
+ import { useEffect, useRef, useState, type MouseEvent } from "react";
+ import { newRelayId, openPopup, waitForRelay } from "@/lib/popup";
+ import { PlatformIcon } from "./marks";
++import { ErrorNote } from "./shell";
+ 
+ /**
+  * Buttons into the platform OAuth flow (`/api/auth/start`). By default the
+@@ -22,6 +23,8 @@ export function PlatformButtons({
+   popup?: boolean;
+ }) {
+   const [waiting, setWaiting] = useState<string | null>(null);
++  const [canRetry, setCanRetry] = useState(false);
++  const [error, setError] = useState<string | null>(null);
+   const cancel = useRef<(() => void) | null>(null);
+   useEffect(() => () => cancel.current?.(), []);
+ 
+@@ -34,11 +37,17 @@ export function PlatformButtons({
+ 
+   const start = (event: MouseEvent<HTMLAnchorElement>, id: string, label: string) => {
+     if (!popup || event.metaKey || event.ctrlKey || event.shiftKey) return;
++    if (waiting && !canRetry) {
++      event.preventDefault();
++      return;
++    }
++    cancel.current?.();
++    setError(null);
++    setCanRetry(false);
+     const relay = newRelayId();
+     const window_ = openPopup(`${href(id)}&relay=${relay}`);
+     if (!window_) return; // Blocked: follow the link in this tab instead.
+     event.preventDefault();
+-    cancel.current?.();
+     const controller = new AbortController();
+     cancel.current = () => {
+       controller.abort();
+@@ -46,9 +55,19 @@ export function PlatformButtons({
+       setWaiting(null);
+     };
+     setWaiting(label);
+-    void waitForRelay(relay, controller.signal).then((location) => {
++    void waitForRelay(relay, controller.signal, {
++      window: window_,
++      onUnavailable: () => {
++        setCanRetry(true);
++        setError("Sign-in has not returned to IdentityHub. You can try a sign-in button again.");
++      },
++    }).then((location) => {
++      if (controller.signal.aborted) return;
+       if (location) window.location.assign(location);
+-      else if (!controller.signal.aborted) setWaiting(null);
++      else {
++        setWaiting(null);
++        setError("Sign-in timed out. Please try again.");
++      }
+     });
+   };
+ 
+@@ -60,14 +79,15 @@ export function PlatformButtons({
+             key={platform.id}
+             href={href(platform.id)}
+             onClick={(event) => start(event, platform.id, platform.label)}
+-            aria-disabled={waiting !== null}
+-            className={`inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt ${waiting ? "pointer-events-none opacity-50" : ""}`}
++            aria-disabled={waiting !== null && !canRetry}
++            className={`inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt ${waiting && !canRetry ? "pointer-events-none opacity-50" : ""}`}
+           >
+             <PlatformIcon id={platform.id} className="size-5" />
+             {verb} {platform.label}
+           </a>
+         ))}
+       </div>
++      <ErrorNote message={error} />
+       {waiting ? (
+         <div
+           role="status"
+diff --git a/src/lib/popup.test.ts b/src/lib/popup.test.ts
+new file mode 100644
+index 0000000..cb5156c
+--- /dev/null
++++ b/src/lib/popup.test.ts
+@@ -0,0 +1,54 @@
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { waitForRelay } from "./popup.ts";
++
++test("a closed popup enables retry after a grace period while the relay can still finish", async (t) => {
++  let now = 0;
++  let requests = 0;
++  let notices = 0;
++  t.mock.method(Date, "now", () => now);
++  t.mock.method(globalThis, "setTimeout", (callback: () => void) => {
++    now += 1000;
++    queueMicrotask(callback);
++    return 0;
++  });
++  t.mock.method(globalThis, "fetch", async () => {
++    requests += 1;
++    return Response.json(
++      requests >= 8
++        ? { status: "done", location: "https://hub.example.com/workspace" }
++        : { status: "pending" },
++    );
++  });
++  const result = await waitForRelay("relay", new AbortController().signal, {
++    window: { closed: true },
++    onUnavailable: () => {
++      assert.ok(now >= 5000);
++      notices += 1;
++    },
++  });
++  assert.equal(result, "https://hub.example.com/workspace");
++  assert.equal(notices, 1);
++  assert.equal(requests, 8);
++});
++
++test("a cancelled attempt cannot navigate using a late relay response", async (t) => {
++  const controller = new AbortController();
++  t.mock.method(globalThis, "fetch", async () => {
++    controller.abort();
++    return Response.json({ status: "done", location: "/workspace" });
++  });
++  assert.equal(await waitForRelay("relay", controller.signal), null);
++});
++
++test("a timed-out relay releases the waiting page", async (t) => {
++  let now = 0;
++  t.mock.method(Date, "now", () => now);
++  t.mock.method(globalThis, "setTimeout", (callback: () => void) => {
++    now += 15 * 60 * 1000;
++    queueMicrotask(callback);
++    return 0;
++  });
++  t.mock.method(globalThis, "fetch", async () => Response.json({ status: "pending" }));
++  assert.equal(await waitForRelay("relay", new AbortController().signal), null);
++});
+diff --git a/src/lib/popup.ts b/src/lib/popup.ts
+index 3db5912..eac9bce 100644
+--- a/src/lib/popup.ts
++++ b/src/lib/popup.ts
+@@ -26,16 +26,32 @@ export function openPopup(url: string): Window | null {
+  * Poll the relay until the popup finishes. Resolves with the location to go
+  * to, or null when cancelled or after 15 minutes.
+  */
+-export async function waitForRelay(relay: string, signal: AbortSignal): Promise<string | null> {
++export async function waitForRelay(
++  relay: string,
++  signal: AbortSignal,
++  popup?: { window: Pick<Window, "closed">; onUnavailable: () => void },
++): Promise<string | null> {
+   const deadline = Date.now() + 15 * 60 * 1000;
++  let closedAt: number | null = null;
++  let notified = false;
+   while (!signal.aborted && Date.now() < deadline) {
+     try {
+       const response = await fetch(`/api/v1/relay/${relay}`, { signal, cache: "no-store" });
+       const body = (await response.json()) as { status?: string; location?: string };
++      if (signal.aborted) return null;
+       if (body.status === "done" && body.location) return body.location;
+     } catch {
+       if (signal.aborted) return null;
+     }
++    if (popup?.window.closed && !notified) {
++      closedAt ??= Date.now();
++      if (Date.now() - closedAt >= 5000) {
++        notified = true;
++        popup.onUnavailable();
++      }
++    }
++    // A provider's COOP policy can make an open popup appear closed. Allow
++    // retrying, but keep polling so that an in-progress login can still finish.
+     await new Promise((resolve) => setTimeout(resolve, 1000));
+   }
+   return null;
+diff --git a/src/server/apps.ts b/src/server/apps.ts
+index f789521..33247a0 100644
+--- a/src/server/apps.ts
++++ b/src/server/apps.ts
+@@ -19,6 +19,7 @@ import { logActivity } from "./activity";
+ import { listAccounts, type AccountView, type Result } from "./workspace";
+ import { effectiveMethods, type MethodView } from "./methods";
+ import { completeRelay, relayHash, validRelay } from "./relay";
++import { appOrigin } from "./env";
+ 
+ const CODE_MINUTES = 10;
+ /** Refresh a platform token this long before it expires. */
+@@ -47,6 +48,7 @@ export async function widgetConfig(clientId: string) {
+   if (!app) throw new ApiError(404, "not_found", "Unknown client_id.");
+   return {
+     name: app.name,
++    hub_origin: appOrigin(),
+     theme: app.widget_theme,
+     methods: effectiveMethods(app.sign_in_methods),
+     redirect_uris: app.redirect_uris,
+diff --git a/src/server/auth-origin.test.ts b/src/server/auth-origin.test.ts
+new file mode 100644
+index 0000000..1b43915
+--- /dev/null
++++ b/src/server/auth-origin.test.ts
+@@ -0,0 +1,64 @@
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { canonicalAuthUrl } from "./auth-origin.ts";
++
++const origin = "https://identityhub.example.com";
++
++test("IP login and popup start move to the cookie host with query parameters intact", () => {
++  for (const path of [
++    "/login?return_to=%2Fapps%3Ftab%3Dmine",
++    "/api/auth/start?platform=twitter&intent=login&return_to=%2Fworkspace&relay=abc",
++    "/api/auth/callback/twitter?code=code&state=ihub_st_state",
++    "/api/auth/verify-email?token=token",
++    "/authorize?client_id=client&redirect_uri=https%3A%2F%2Fapp.example%2Fcallback&relay=abc",
++    "/apps/my-app",
++  ]) {
++    assert.equal(
++      canonicalAuthUrl(new Request(`http://84.247.181.21:8316${path}`), origin),
++      `${origin}${path}`,
++    );
++  }
++});
++
++test("canonical HTTPS and proxied HTTPS do not redirect in a loop", () => {
++  assert.equal(canonicalAuthUrl(new Request(`${origin}/login`), origin), null);
++  assert.equal(
++    canonicalAuthUrl(
++      new Request("http://container:8080/login", {
++        headers: { host: "identityhub.example.com", "x-forwarded-proto": "https" },
++      }),
++      origin,
++    ),
++    null,
++  );
++  assert.equal(
++    canonicalAuthUrl(new Request("http://identityhub.example.com/login"), origin),
++    `${origin}/login`,
++  );
++});
++
++test("public API, relay polling, assets and POST requests stay on their requested host", () => {
++  for (const path of [
++    "/api/health",
++    "/api/v1/relay/abc",
++    "/api/v1/widget/client",
++    "/widget.js",
++    "/docs",
++  ]) {
++    assert.equal(canonicalAuthUrl(new Request(`http://84.247.181.21:8316${path}`), origin), null);
++  }
++  assert.equal(
++    canonicalAuthUrl(
++      new Request("http://84.247.181.21:8316/api/auth/logout", { method: "POST" }),
++      origin,
++    ),
++    null,
++  );
++});
++
++test("local HTTP development stays on its configured origin", () => {
++  assert.equal(
++    canonicalAuthUrl(new Request("http://localhost:8080/login"), "http://localhost:8080"),
++    null,
++  );
++});
+diff --git a/src/server/auth-origin.ts b/src/server/auth-origin.ts
+new file mode 100644
+index 0000000..ef9c042
+--- /dev/null
++++ b/src/server/auth-origin.ts
+@@ -0,0 +1,33 @@
++/** Keep authentication and account pages on the host that owns the session cookie. */
++export function canonicalAuthUrl(request: Request, origin: string): string | null {
++  if (request.method !== "GET") return null;
++  const url = new URL(request.url);
++  const paths = [
++    "/login",
++    "/signup",
++    "/forgot-password",
++    "/reset-password",
++    "/authorize",
++    "/workspace",
++    "/settings",
++    "/deletion",
++    "/apps",
++  ];
++  if (
++    !paths.includes(url.pathname) &&
++    !url.pathname.startsWith("/apps/") &&
++    !url.pathname.startsWith("/api/auth/")
++  )
++    return null;
++
++  const canonical = new URL(origin);
++  // Behind Caddy the connection to the container is HTTP, but the browser is on HTTPS.
++  const host = request.headers.get("host") ?? url.host;
++  const protocol = request.headers.get("x-forwarded-proto") ?? url.protocol.slice(0, -1);
++  if (host === canonical.host && `${protocol}:` === canonical.protocol) return null;
++
++  // Assign components rather than resolve a path, so the configured host always wins.
++  canonical.pathname = url.pathname;
++  canonical.search = url.search;
++  return canonical.href;
++}
+diff --git a/src/server/oauth.ts b/src/server/oauth.ts
+index 9d231fe..311b162 100644
+--- a/src/server/oauth.ts
++++ b/src/server/oauth.ts
+@@ -163,8 +163,9 @@ export async function finishAuthorization(provider: string, request: Request): P
+   }
+   const result = await settle(provider, url, pending, request);
+   if (!pending.relay_hash) return result;
+-  // Signed in from a popup: hand the destination to the opener and let the popup close.
+-  await completeRelay(pending.relay_hash, result.location);
++  // The opener may still be on the IP address. The session belongs to APP_ORIGIN,
++  // so a relative destination would send it back to a host with no session cookie.
++  await completeRelay(pending.relay_hash, new URL(result.location, appOrigin()).href);
+   return { ...result, relayed: true };
+ }
+ 
+diff --git a/src/start.ts b/src/start.ts
+index ec1f262..3487e8e 100644
+--- a/src/start.ts
++++ b/src/start.ts
+@@ -1,4 +1,6 @@
+ import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
++import { canonicalAuthUrl } from "./server/auth-origin";
++import { appOrigin } from "./server/env";
+ 
+ /** Public endpoints other sites load (the widget's config); they need CORS and cross-origin CORP. */
+ const isPublicApi = (pathname: string) =>
+@@ -10,6 +12,13 @@ const isPublicApi = (pathname: string) =>
+  * context, so every inline script the framework writes carries it.
+  */
+ const securityHeaders = createMiddleware().server(async ({ next, request }) => {
++  const canonical = canonicalAuthUrl(request, appOrigin());
++  if (canonical) {
++    return new Response(null, {
++      status: 302,
++      headers: { location: canonical, "cache-control": "no-store" },
++    });
++  }
+   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
+   const result = await next({ context: { nonce } });
+   const headers = result.response.headers;

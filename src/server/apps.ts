@@ -19,6 +19,7 @@ import { logActivity } from "./activity";
 import { listAccounts, type AccountView, type Result } from "./workspace";
 import { effectiveMethods, type MethodView } from "./methods";
 import { completeRelay, relayHash, validRelay } from "./relay";
+import { appOrigin } from "./env";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -47,6 +48,7 @@ export async function widgetConfig(clientId: string) {
   if (!app) throw new ApiError(404, "not_found", "Unknown client_id.");
   return {
     name: app.name,
+    hub_origin: appOrigin(),
     theme: app.widget_theme,
     methods: effectiveMethods(app.sign_in_methods),
     redirect_uris: app.redirect_uris,

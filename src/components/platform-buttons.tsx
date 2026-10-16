@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { newRelayId, openPopup, waitForRelay } from "@/lib/popup";
 import { PlatformIcon } from "./marks";
+import { ErrorNote } from "./shell";
 
 /**
  * Buttons into the platform OAuth flow (`/api/auth/start`). By default the
@@ -22,6 +23,8 @@ export function PlatformButtons({
   popup?: boolean;
 }) {
   const [waiting, setWaiting] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const cancel = useRef<(() => void) | null>(null);
   useEffect(() => () => cancel.current?.(), []);
 
@@ -34,11 +37,17 @@ export function PlatformButtons({
 
   const start = (event: MouseEvent<HTMLAnchorElement>, id: string, label: string) => {
     if (!popup || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    if (waiting && !canRetry) {
+      event.preventDefault();
+      return;
+    }
+    cancel.current?.();
+    setError(null);
+    setCanRetry(false);
     const relay = newRelayId();
     const window_ = openPopup(`${href(id)}&relay=${relay}`);
     if (!window_) return; // Blocked: follow the link in this tab instead.
     event.preventDefault();
-    cancel.current?.();
     const controller = new AbortController();
     cancel.current = () => {
       controller.abort();
@@ -46,9 +55,19 @@ export function PlatformButtons({
       setWaiting(null);
     };
     setWaiting(label);
-    void waitForRelay(relay, controller.signal).then((location) => {
+    void waitForRelay(relay, controller.signal, {
+      window: window_,
+      onUnavailable: () => {
+        setCanRetry(true);
+        setError("Sign-in has not returned to IdentityHub. You can try a sign-in button again.");
+      },
+    }).then((location) => {
+      if (controller.signal.aborted) return;
       if (location) window.location.assign(location);
-      else if (!controller.signal.aborted) setWaiting(null);
+      else {
+        setWaiting(null);
+        setError("Sign-in timed out. Please try again.");
+      }
     });
   };
 
@@ -60,14 +79,15 @@ export function PlatformButtons({
             key={platform.id}
             href={href(platform.id)}
             onClick={(event) => start(event, platform.id, platform.label)}
-            aria-disabled={waiting !== null}
-            className={`inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt ${waiting ? "pointer-events-none opacity-50" : ""}`}
+            aria-disabled={waiting !== null && !canRetry}
+            className={`inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt ${waiting && !canRetry ? "pointer-events-none opacity-50" : ""}`}
           >
             <PlatformIcon id={platform.id} className="size-5" />
             {verb} {platform.label}
           </a>
         ))}
       </div>
+      <ErrorNote message={error} />
       {waiting ? (
         <div
           role="status"
