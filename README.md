@@ -82,6 +82,12 @@ On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`
 bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.makketing.com
 ```
 
+No DNS record yet? Deploy on a temporary name that sslip.io resolves to the server's IP, then re-run with the real domain once its A record exists (everyone is signed out and the widget snippet's script URL changes; accounts and apps are kept):
+
+```bash
+bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.84-247-181-21.sslip.io
+```
+
 By hand, the same steps are:
 
 ```bash

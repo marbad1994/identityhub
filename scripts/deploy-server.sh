@@ -4,6 +4,11 @@
 #
 #   bash /opt/identityhub/scripts/deploy-server.sh [hub origin]
 #
+# No DNS record yet? Use a name that sslip.io resolves to the server's IP,
+# e.g. https://identityhub.84-247-181-21.sslip.io, and re-run with the real
+# domain once its A record exists. Changing the address signs everyone out
+# and changes the widget snippet's script URL; accounts and apps are kept.
+#
 # 1. Turns on SocialPostAPI's callback forwarding (IDENTITY_HUB_URL) and
 #    deploys SocialPostAPI's latest main with its own scripts/deploy.sh
 #    (backup, migrate, health check, rollback), or just recreates its
@@ -49,6 +54,9 @@ log "Identity Hub at $HUB_DIR"
 cd "$HUB_DIR"
 git pull --ff-only
 bash scripts/env-from-socialpostapi.sh "$SPA_DIR/.env" "$HUB_DIR/.env" "$HUB_ORIGIN"
+# The address given to this script always wins, so moving the hub to another
+# hostname (e.g. from a temporary sslip.io name to the real domain) is a re-run.
+sed -i "s|^APP_ORIGIN=.*|APP_ORIGIN=$HUB_ORIGIN|" "$HUB_DIR/.env"
 if grep -q '^SMTP_HOST=$' .env || ! grep -q '^SMTP_HOST=' .env; then
   warn "SMTP_HOST is empty: email and password sign-in stays hidden until it is set in $HUB_DIR/.env."
 fi
