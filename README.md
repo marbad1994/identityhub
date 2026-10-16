@@ -75,6 +75,15 @@ The image is published to `ghcr.io/marbad1994/identityhub` by `.github/workflows
 
 On the IP address, pages and the app API (`/api/v1/*`) work directly. Signing in always finishes on `APP_ORIGIN`: platforms only redirect to the registered https callback, and the session cookie is `Secure` when `APP_ORIGIN` is https, so a browser keeps it only on the domain. The container applies pending migrations on start.
 
+On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`, image, Caddy route, checks) and is safe to re-run:
+
+```bash
+[ -d /opt/identityhub ] || git clone https://github.com/marbad1994/identityhub /opt/identityhub
+bash /opt/identityhub/scripts/deploy-server.sh https://identity.makketing.com
+```
+
+By hand, the same steps are:
+
 ```bash
 cp .env.example .env
 bash scripts/env-from-socialpostapi.sh /opt/socialpostapi/.env .env https://identity.makketing.com
