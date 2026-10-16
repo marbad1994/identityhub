@@ -27,6 +27,15 @@ export type AuthorizedAppView = {
   grants: { accountId: string; scopes: ScopeId[] }[];
 };
 
+export type AppMemberView = {
+  userId: string;
+  displayName: string;
+  email: string | null;
+  /** Platform accounts this person let the app use, as "Instagram @name". */
+  accounts: string[];
+  lastUsedAt: string | null;
+};
+
 export type DeveloperAppView = {
   id: string;
   name: string;
@@ -290,6 +299,100 @@ export async function getDeveloperApp(
     userId,
   ]);
   return app ? appView(app) : null;
+}
+
+type MemberRow = {
+  id: string;
+  display_name: string;
+  email: string | null;
+  accounts: { provider: string; handle: string }[] | string | null;
+  last_used_at: Date | null;
+};
+
+function memberAccounts(value: MemberRow["accounts"]): string[] {
+  let list = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value) as MemberRow["accounts"];
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list.map((account) => `${platformLabel(account.provider)} ${account.handle}`);
+}
+
+/** People who have signed in to this app, or who still have a grant or token for it. */
+export async function listAppMembers(ownerId: string, appId: string): Promise<AppMemberView[]> {
+  const app = await one(`select id from apps where id = $1 and owner_id = $2`, [appId, ownerId]);
+  if (!app) return [];
+  const found = await rows<MemberRow>(
+    `select u.id, u.display_name, u.email,
+            coalesce(
+              (select json_agg(json_build_object('provider', a.provider, 'handle', a.handle)
+                               order by a.provider, a.handle)
+               from app_grants g
+               join accounts a on a.id = g.account_id
+               where g.user_id = u.id and g.app_id = $1),
+              '[]'::json
+            ) as accounts,
+            (select max(t.last_used_at) from app_tokens t where t.user_id = u.id and t.app_id = $1) as last_used_at
+     from users u
+     where u.id in (
+       select user_id from app_grants where app_id = $1
+       union
+       select user_id from app_tokens where app_id = $1
+     )
+     order by lower(u.display_name)`,
+    [appId],
+  );
+  return found.map((row) => ({
+    userId: row.id,
+    displayName: row.display_name,
+    email: row.email,
+    accounts: memberAccounts(row.accounts),
+    lastUsedAt: row.last_used_at ? iso(row.last_used_at) : null,
+  }));
+}
+
+/** The app owner cuts one person off: their grants, tokens and unused codes for this app go away. */
+export async function removeAppMember(
+  ownerId: string,
+  appId: string,
+  memberUserId: string,
+): Promise<Result> {
+  const app = await one<{ name: string }>(`select name from apps where id = $1 and owner_id = $2`, [
+    appId,
+    ownerId,
+  ]);
+  if (!app) return { ok: false, error: "That app is not yours." };
+  const member = await one<{ display_name: string }>(
+    `select display_name from users where id = $1`,
+    [memberUserId],
+  );
+  if (!member) return { ok: false, error: "That person is not signed in to this app." };
+  const removed = await tx(async (client) => {
+    const grants = await rows(
+      `delete from app_grants where user_id = $1 and app_id = $2 returning user_id`,
+      [memberUserId, appId],
+      client,
+    );
+    const tokens = await rows(
+      `delete from app_tokens where user_id = $1 and app_id = $2 returning user_id`,
+      [memberUserId, appId],
+      client,
+    );
+    const codes = await rows(
+      `delete from auth_codes where user_id = $1 and app_id = $2 returning user_id`,
+      [memberUserId, appId],
+      client,
+    );
+    return grants.length + tokens.length + codes.length;
+  });
+  if (removed === 0) return { ok: false, error: "That person is not signed in to this app." };
+  await logActivity(ownerId, "Member removed", `${member.display_name} can no longer use ${app.name}`);
+  await logActivity(memberUserId, "App access removed", app.name);
+  return { ok: true };
 }
 
 /** Save which sign-in methods the app's widget and consent screen offer, and the widget theme. */

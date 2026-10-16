@@ -55,8 +55,10 @@ function Docs() {
         data-redirect-uri="https://your.app/callback"
         data-scope="profile" async></script>`}</Code>
         <p>
-          Every button opens the hub in a popup: passwords are only ever typed on Identity Hub,
-          never on your site. When the person is done the popup closes and your page goes to your
+          Visitors see one Sign in button. Opening it lists each sign-in method you turned on, plus
+          Sign up with email. Each of those opens the hub in a popup: passwords are only ever typed on
+          Identity Hub, never on your site. When the person is done the popup closes and your page
+          goes to your
           redirect URI with code and state, exactly as a full-page redirect would (which is what
           happens if popups are blocked). Before leaving, the widget stores a random state in the
           cookie <strong>ihub_state</strong> on your site. Your callback must check that the state

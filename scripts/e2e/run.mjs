@@ -289,6 +289,7 @@ async function main() {
       await alice.page.waitForURL(`${HUB}/apps/**`);
       await alice.page.getByRole("heading", { name: "Sign-in widget" }).waitFor();
       await alice.page.getByRole("button", { name: "Continue with Facebook" }).waitFor();
+      await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
       app.builderUrl = alice.page.url();
     });
 
@@ -645,6 +646,7 @@ async function main() {
       async () => {
         await alice.page.goto(app.builderUrl);
         await alice.page.getByRole("button", { name: "Continue with Facebook" }).waitFor();
+        await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
         for (const label of [
           "Instagram",
           "Facebook",
@@ -660,6 +662,7 @@ async function main() {
         await alice.page.getByText("All changes saved").waitFor();
         await alice.page.getByRole("button", { name: "Continue with X" }).waitFor();
         await alice.page.getByRole("button", { name: "Continue with Email" }).waitFor();
+        await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
         assert.equal(
           await alice.page.getByRole("button", { name: "Continue with Facebook" }).count(),
           0,
@@ -693,6 +696,7 @@ async function main() {
           }),
         );
         await carol.page.goto("http://localhost:3472/shop");
+        await carol.page.getByRole("button", { name: "Sign in", exact: true }).click();
         const [popup] = await Promise.all([
           carol.page.waitForEvent("popup"),
           carol.page.getByRole("button", { name: "Continue with Email" }).click(),

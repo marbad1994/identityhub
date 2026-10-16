@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
-import { deleteApp, fetchDeveloperApp, fetchSession, rotateAppSecret, saveWidget } from "@/lib/api";
+import {
+  deleteApp,
+  fetchDeveloperApp,
+  fetchSession,
+  removeAppMember,
+  rotateAppSecret,
+  saveWidget,
+} from "@/lib/api";
 import { useAction } from "@/lib/use-action";
 import { PlatformIcon } from "@/components/marks";
 import { ErrorNote, Page } from "@/components/shell";
 import { AppForm, SecretNotice } from "@/components/app-form";
-import type { DeveloperAppView } from "@/server/workspace";
+import type { AppMemberView, DeveloperAppView } from "@/server/workspace";
 import type { MethodView } from "@/server/methods";
 
 export const Route = createFileRoute("/apps/$appId")({
@@ -33,7 +40,7 @@ declare global {
 }
 
 function AppPage() {
-  const { app, available, hubOrigin } = Route.useLoaderData();
+  const { app, members, available, hubOrigin } = Route.useLoaderData();
   const navigate = useNavigate();
   const { error, run } = useAction();
   const [editing, setEditing] = useState(false);
@@ -116,7 +123,71 @@ function AppPage() {
           )}
         </div>
       </section>
+
+      <Members appName={app.name} appId={app.id} members={members} run={run} />
     </Page>
+  );
+}
+
+function Members({
+  appName,
+  appId,
+  members,
+  run,
+}: {
+  appName: string;
+  appId: string;
+  members: AppMemberView[];
+  run: ReturnType<typeof useAction>["run"];
+}) {
+  return (
+    <section className="mt-12">
+      <h2 className="text-2xl font-semibold tracking-tight">Members</h2>
+      <p className="mt-2 text-sm text-muted">
+        People who have signed in to {appName}. Removing someone ends their access. Signing in
+        again starts it once more.
+      </p>
+      {members.length === 0 ? (
+        <p className="mt-4 rounded-2xl border border-line p-4 text-sm text-muted">
+          No one has signed in yet.
+        </p>
+      ) : (
+        <ul className="mt-4 grid gap-3">
+          {members.map((member) => (
+            <li key={member.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-4">
+              <div className="min-w-0">
+                <p className="font-medium">{member.displayName}</p>
+                <p className="text-sm text-muted">{member.email ?? "No email on this account"}</p>
+                {member.accounts.length > 0 ? (
+                  <p className="mt-1 text-sm">{member.accounts.join(", ")}</p>
+                ) : null}
+                <p className="mt-1 text-sm text-muted">
+                  {member.lastUsedAt
+                    ? `Last used ${new Date(member.lastUsedAt).toLocaleString()}`
+                    : "Has not used a token yet"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-danger hover:bg-danger-soft"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      `Remove ${member.displayName} from ${appName}? Their access to this app ends.`,
+                    )
+                  )
+                    return;
+                  await run(() => removeAppMember({ data: { appId, userId: member.userId } }));
+                }}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -323,6 +394,10 @@ function WidgetBuilder({
               className={`mb-4 text-sm font-semibold ${theme === "dark" ? "text-on-ink-muted" : "text-muted"}`}
             >
               Preview
+            </p>
+            <p className={`mb-4 text-sm ${theme === "dark" ? "text-on-ink-muted" : "text-muted"}`}>
+              Visitors see Sign in first. These are the choices that open from it, including email
+              sign-up.
             </p>
             <div ref={preview} />
           </div>

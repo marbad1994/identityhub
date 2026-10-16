@@ -140,11 +140,22 @@ export const fetchDeveloperApp = createServerFn({ method: "GET" })
     const { getDeveloperApp } = await import("@/server/workspace");
     const { availableMethods } = await import("@/server/methods");
     const { appOrigin } = await import("@/server/env");
+    const app = await getDeveloperApp(context.user.id, data.appId);
+    const { listAppMembers } = await import("@/server/workspace");
     return {
-      app: await getDeveloperApp(context.user.id, data.appId),
+      app,
+      members: app ? await listAppMembers(context.user.id, data.appId) : [],
       available: availableMethods(),
       hubOrigin: appOrigin(),
     };
+  });
+
+export const removeAppMember = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .validator(z.object({ appId: z.string().max(64), userId: z.string().max(64) }))
+  .handler(async ({ context, data }) => {
+    const { removeAppMember } = await import("@/server/workspace");
+    return removeAppMember(context.user.id, data.appId, data.userId);
   });
 
 export const saveWidget = createServerFn({ method: "POST" })
