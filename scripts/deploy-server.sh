@@ -14,7 +14,7 @@
 # 4. Checks DNS and the public health endpoints.
 set -euo pipefail
 
-HUB_ORIGIN="${1:-https://identity.makketing.com}"
+HUB_ORIGIN="${1:-https://identityhub.makketing.com}"
 HUB_HOST="${HUB_ORIGIN#https://}"
 HUB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 

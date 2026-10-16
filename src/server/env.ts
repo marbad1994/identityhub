@@ -10,7 +10,7 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-/** Public origin of the hub, e.g. https://identity.makketing.com. No trailing slash. */
+/** Public origin of the hub, e.g. https://identityhub.makketing.com. No trailing slash. */
 export function appOrigin(): string {
   return (env("APP_ORIGIN") ?? "http://localhost:8080").replace(/\/+$/, "");
 }

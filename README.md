@@ -39,7 +39,7 @@ Apps are registered under Apps with exact redirect URIs. The client secret is sh
 | Purpose | Variables |
 |---|---|
 | Database | `DATABASE_URL` (Postgres) |
-| Public origin | `APP_ORIGIN`, e.g. `https://identity.makketing.com` |
+| Public origin | `APP_ORIGIN`, e.g. `https://identityhub.makketing.com` |
 | Token encryption | `TOKEN_ENCRYPTION_KEY` (any long random string; AES-256-GCM key is derived from it) |
 | Platforms | `TWITTER_`, `INSTAGRAM_`, `FACEBOOK_`, `TIKTOK_`, `LINKEDIN_`, `YOUTUBE_`, `REDDIT_`, `SNAPCHAT_` + `CLIENT_ID` / `CLIENT_SECRET` |
 | Facebook Page picker (optional) | `FACEBOOK_LOGIN_CONFIG_ID` |
@@ -79,14 +79,14 @@ On the Contabo host, one script does all of it (SocialPostAPI forwarding, `.env`
 
 ```bash
 [ -d /opt/identityhub ] || git clone https://github.com/marbad1994/identityhub /opt/identityhub
-bash /opt/identityhub/scripts/deploy-server.sh https://identity.makketing.com
+bash /opt/identityhub/scripts/deploy-server.sh https://identityhub.makketing.com
 ```
 
 By hand, the same steps are:
 
 ```bash
 cp .env.example .env
-bash scripts/env-from-socialpostapi.sh /opt/socialpostapi/.env .env https://identity.makketing.com
+bash scripts/env-from-socialpostapi.sh /opt/socialpostapi/.env .env https://identityhub.makketing.com
 vi .env
 docker compose pull && docker compose up -d
 ```
@@ -96,7 +96,7 @@ docker compose pull && docker compose up -d
 Route a hostname to it from the host's existing reverse proxy, for example Makketing's Caddy:
 
 ```text
-identity.makketing.com {
+identityhub.makketing.com {
 	reverse_proxy host.docker.internal:8316
 }
 ```

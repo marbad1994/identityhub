@@ -12,7 +12,7 @@ set -euo pipefail
 
 SOURCE="${1:-/opt/socialpostapi/.env}"
 TARGET="${2:-/opt/identityhub/.env}"
-ORIGIN="${3:-https://identity.makketing.com}"
+ORIGIN="${3:-https://identityhub.makketing.com}"
 
 [ -f "$SOURCE" ] || { echo "No SocialPostAPI env file at $SOURCE" >&2; exit 1; }
 touch "$TARGET"
