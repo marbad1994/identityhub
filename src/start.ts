@@ -1,7 +1,8 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 
 /** Public endpoints other sites load (the widget's config); they need CORS and cross-origin CORP. */
-const isPublicApi = (pathname: string) => pathname.startsWith("/api/v1/widget/");
+const isPublicApi = (pathname: string) =>
+  pathname.startsWith("/api/v1/widget/") || pathname.startsWith("/api/v1/relay/");
 
 /**
  * Security headers on every response, with a fresh CSP nonce per request.
@@ -38,7 +39,12 @@ const securityHeaders = createMiddleware().server(async ({ next, request }) => {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
   );
-  set("Cross-Origin-Opener-Policy", "same-origin");
+  // Hub pages keep their link to the sign-in popups they open. Pages a popup
+  // passes through (/authorize, opened by the widget on another site, and the
+  // /api/auth/* hops) do not cut the link to their opener, so the popup can
+  // still close itself at the end.
+  const inPopupFlow = url.pathname === "/authorize" || url.pathname.startsWith("/api/auth/");
+  set("Cross-Origin-Opener-Policy", inPopupFlow ? "unsafe-none" : "same-origin-allow-popups");
   set("Cross-Origin-Resource-Policy", isPublicApi(url.pathname) ? "cross-origin" : "same-origin");
   // HSTS only means something on https; the public IP port serves plain http.
   if ((request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "")) === "https") {

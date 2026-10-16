@@ -1,3 +1,4 @@
+import { getGlobalStartContext } from "@tanstack/react-start";
 import { ApiError } from "./apps";
 
 export function redirect(location: string, setCookie?: string): Response {
@@ -23,4 +24,25 @@ export async function apiResponse(work: () => Promise<unknown>): Promise<Respons
       { status: 500 },
     );
   }
+}
+
+/**
+ * The last page a sign-in popup shows: it closes itself. The opener learns
+ * the result by polling the relay, so this works even when the platform cut
+ * the popup's link to its opener; if the browser refuses to close a window
+ * the hub did not open itself, the message stays.
+ */
+export function popupDone(message: string, setCookie?: string): Response {
+  const nonce = (getGlobalStartContext() as { nonce?: string } | undefined)?.nonce ?? "";
+  const escaped = message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Identity Hub</title>
+<style nonce="${nonce}">body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:"Inter Variable",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#fff}p{margin:0;padding:24px;text-align:center;font-size:17px;line-height:1.5}</style></head>
+<body><p>${escaped}<br>You can close this window.</p>
+<script nonce="${nonce}">window.close();</script></body></html>`;
+  const headers = new Headers({
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  if (setCookie) headers.append("set-cookie", setCookie);
+  return new Response(html, { status: 200, headers });
 }

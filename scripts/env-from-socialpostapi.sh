@@ -46,6 +46,12 @@ put TOKEN_ENCRYPTION_KEY "$(openssl rand -hex 32)"
 put APP_ORIGIN "$ORIGIN"
 put IDENTITYHUB_BIND "0.0.0.0"
 
+# Reuse SocialPostAPI's registered callbacks: no platform needs a new redirect URI.
+spa_base="$(get BASE_URL "$SOURCE")"
+if [ -n "$spa_base" ]; then
+  put PLATFORM_CALLBACK_BASE "${spa_base%/}/api/connect"
+fi
+
 for prefix in TWITTER INSTAGRAM FACEBOOK TIKTOK LINKEDIN YOUTUBE REDDIT SNAPCHAT; do
   put "${prefix}_CLIENT_ID" "$(get "${prefix}_CLIENT_ID" "$SOURCE")"
   put "${prefix}_CLIENT_SECRET" "$(get "${prefix}_CLIENT_SECRET" "$SOURCE")"
@@ -64,4 +70,5 @@ put FACEBOOK_LOGIN_CONFIG_ID "${fb_config:-4572491769705504}"
 
 echo
 echo "Wrote $TARGET. 'missing' lines need a value by hand (Snapchat needs its own Snap Kit app)."
+echo "In $SOURCE, set IDENTITY_HUB_URL=$ORIGIN so SocialPostAPI forwards the hub's sign-ins."
 echo "SMTP_FROM_EMAIL is copied from SocialPostAPI; change it if the hub should send from another address."

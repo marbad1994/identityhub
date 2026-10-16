@@ -28,6 +28,7 @@ const PORT = 8316;
 const HUB = `http://localhost:${PORT}`;
 const APP_REDIRECT = "http://localhost:3472/callback";
 const SHOTS = process.env.E2E_SCREENSHOTS;
+const SPA_CALLBACK_BASE = "http://localhost:3472/api/connect";
 const MAIL_FILE = join(tmpdir(), `identityhub-e2e-mail-${process.pid}.jsonl`);
 
 const env = {
@@ -40,6 +41,8 @@ const env = {
   NODE_ENV: "production",
   // Outgoing email is written here instead of being sent.
   MAIL_FILE,
+  // Reuse "SocialPostAPI's" registered callbacks; the test plays its forwarding.
+  PLATFORM_CALLBACK_BASE: SPA_CALLBACK_BASE,
 };
 for (const prefix of [
   "TWITTER",
@@ -96,8 +99,10 @@ const AUTHORIZE_PAGES = {
   "accounts.snapchat.com/accounts/oauth2/auth": "snapchat",
 };
 
-async function newPerson(browser, person) {
+async function newPerson(browser, person, { blockPopups = false } = {}) {
   const context = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  // A browser that blocks popups: every sign-in must fall back to a full-page redirect.
+  if (blockPopups) await context.addInitScript(() => (window.open = () => null));
   const captured = [];
   // Playwright does not route requests that follow a redirect, so intercept
   // the hub's own /api/auth/start, check the authorize URL it answers with,
@@ -107,8 +112,17 @@ async function newPerson(browser, person) {
     const location = new URL(response.headers().location, HUB);
     const platform = AUTHORIZE_PAGES[`${location.host}${location.pathname}`];
     if (!platform) return route.fulfill({ response });
-    assert.ok(location.searchParams.get("state"), `${platform} authorize URL has a state`);
-    assert.equal(location.searchParams.get("redirect_uri"), `${HUB}/api/auth/callback/${platform}`);
+    assert.match(
+      location.searchParams.get("state") ?? "",
+      /^ihub_st_/,
+      `${platform} state is marked as the hub's`,
+    );
+    // The platform is told SocialPostAPI's already-registered callback, which
+    // forwards hub states to the hub; going straight to the hub stands in for that.
+    assert.equal(
+      location.searchParams.get("redirect_uri"),
+      `${SPA_CALLBACK_BASE}/${platform}/callback`,
+    );
     const back = `${HUB}/api/auth/callback/${platform}?code=${person}&state=${encodeURIComponent(location.searchParams.get("state"))}`;
     return route.fulfill({ status: 302, headers: { location: back } });
   });
@@ -214,8 +228,12 @@ async function main() {
 
     await step("sign in with X creates a user and connects the account", async () => {
       await alice.page.goto(`${HUB}/login`);
-      await alice.page.getByRole("link", { name: "Continue with X" }).click();
+      const [popup] = await Promise.all([
+        alice.page.waitForEvent("popup"),
+        alice.page.getByRole("link", { name: "Continue with X" }).click(),
+      ]);
       await alice.page.waitForURL(`${HUB}/workspace`);
+      if (!popup.isClosed()) await popup.waitForEvent("close");
       await alice.page.getByRole("heading", { name: "alice on X" }).waitFor();
     });
 
@@ -395,7 +413,7 @@ async function main() {
       assert.equal(again.body.access_token, refreshed.body.access_token);
     });
 
-    const bob = await newPerson(browser, "bob");
+    const bob = await newPerson(browser, "bob", { blockPopups: true });
     await step(
       "a second person signs in, sees only their data, and can deny or allow the same app",
       async () => {
@@ -675,11 +693,21 @@ async function main() {
           }),
         );
         await carol.page.goto("http://localhost:3472/shop");
-        await carol.page.getByRole("button", { name: "Continue with Email" }).click();
-        await carol.page.getByRole("heading", { name: "Sign in to SocialPostAPI" }).waitFor();
-        await carol.page.getByText("SocialPostAPI will only learn who you are.").waitFor();
-        await carol.page.getByRole("button", { name: "Allow" }).click();
+        const [popup] = await Promise.all([
+          carol.page.waitForEvent("popup"),
+          carol.page.getByRole("button", { name: "Continue with Email" }).click(),
+        ]);
+        assert.equal(
+          carol.page.url(),
+          "http://localhost:3472/shop",
+          "host page stays while the popup is open",
+        );
+        await popup.getByRole("heading", { name: "Sign in to SocialPostAPI" }).waitFor();
+        await popup.getByText("SocialPostAPI will only learn who you are.").waitFor();
+        await shot(popup, "widget-popup");
+        await popup.getByRole("button", { name: "Allow" }).click();
         await carol.page.waitForURL(`${APP_REDIRECT}**`);
+        if (!popup.isClosed()) await popup.waitForEvent("close");
         const back = carol.captured.at(-1);
         const cookie = (await carol.context.cookies("http://localhost:3472")).find(
           (c) => c.name === "ihub_state",

@@ -18,6 +18,7 @@ import { credentials, platform } from "./platforms";
 import { logActivity } from "./activity";
 import { listAccounts, type AccountView, type Result } from "./workspace";
 import { effectiveMethods, type MethodView } from "./methods";
+import { completeRelay, relayHash, validRelay } from "./relay";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -61,7 +62,19 @@ export type AuthorizeRequest = {
   redirectUri: string;
   state?: string;
   scope?: string;
+  /** Set when the widget opened this consent in a popup; the opener polls for the result. */
+  relay?: string;
 };
+
+/** Finish the request: hand the redirect to a waiting widget, or to this window. */
+async function deliver(
+  request: AuthorizeRequest,
+  redirect: string,
+): Promise<{ ok: true; redirect: string; relayed: boolean }> {
+  if (!validRelay(request.relay)) return { ok: true, redirect, relayed: false };
+  await completeRelay(relayHash(request.relay), redirect);
+  return { ok: true, redirect, relayed: true };
+}
 
 export type ConsentApp = { name: string; homepageUrl: string; methods: MethodView[] };
 
@@ -118,7 +131,7 @@ function redirectWith(redirectUri: string, params: Record<string, string | undef
 export async function approve(
   userId: string,
   request: AuthorizeRequest & { accountIds: string[] },
-): Promise<Result<{ redirect: string }>> {
+): Promise<Result<{ redirect: string; relayed: boolean }>> {
   const checked = await consentView(userId, request);
   if (!checked.ok) return checked;
   const view = checked.view!;
@@ -155,16 +168,18 @@ export async function approve(
       ? `${app.name} received your identity only`
       : `${app.name} may use ${chosen.map((a) => `${platformLabel(a.provider)} ${a.handle} (${a.grantable.join(", ")})`).join("; ")}`,
   );
-  return { ok: true, redirect: redirectWith(request.redirectUri, { code, state: request.state }) };
+  return deliver(request, redirectWith(request.redirectUri, { code, state: request.state }));
 }
 
-export async function deny(request: AuthorizeRequest): Promise<Result<{ redirect: string }>> {
+export async function deny(
+  request: AuthorizeRequest,
+): Promise<Result<{ redirect: string; relayed: boolean }>> {
   const checked = await consentView(null, request);
   if (!checked.ok) return checked;
-  return {
-    ok: true,
-    redirect: redirectWith(request.redirectUri, { error: "access_denied", state: request.state }),
-  };
+  return deliver(
+    request,
+    redirectWith(request.redirectUri, { error: "access_denied", state: request.state }),
+  );
 }
 
 // ---------------------------------------------------------------------------

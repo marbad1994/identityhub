@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// GET /api/auth/start?platform=twitter&intent=login|connect&return_to=/path
+// GET /api/auth/start?platform=twitter&intent=login|connect&return_to=/path[&relay=<id>]
+// relay: the sign-in runs in a popup and the opener polls /api/v1/relay/<id> for the result.
 export const Route = createFileRoute("/api/auth/start")({
   server: {
     handlers: {
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/api/auth/start")({
           intent,
           returnTo: safeReturnTo(url.searchParams.get("return_to"), "/workspace"),
           user: await sessionUser(request),
+          relay: url.searchParams.get("relay"),
         });
         return redirect(result.location);
       },

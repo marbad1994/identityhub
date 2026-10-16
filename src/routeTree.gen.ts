@@ -31,6 +31,7 @@ import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
 import { Route as ApiAuthCallbackPlatformRouteImport } from './routes/api/auth/callback.$platform'
 import { Route as ApiV1OauthRevokeRouteImport } from './routes/api/v1/oauth/revoke'
 import { Route as ApiV1OauthTokenRouteImport } from './routes/api/v1/oauth/token'
+import { Route as ApiV1RelayRelayIdRouteImport } from './routes/api/v1/relay.$relayId'
 import { Route as ApiV1WidgetClientIdRouteImport } from './routes/api/v1/widget.$clientId'
 import { Route as ApiV1AccountsAccountIdTokenRouteImport } from './routes/api/v1/accounts.$accountId.token'
 
@@ -144,6 +145,11 @@ const ApiV1OauthTokenRoute = ApiV1OauthTokenRouteImport.update({
   path: '/api/v1/oauth/token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1RelayRelayIdRoute = ApiV1RelayRelayIdRouteImport.update({
+  id: '/api/v1/relay/$relayId',
+  path: '/api/v1/relay/$relayId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1WidgetClientIdRoute = ApiV1WidgetClientIdRouteImport.update({
   id: '/api/v1/widget/$clientId',
   path: '/api/v1/widget/$clientId',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
   '/api/v1/widget/$clientId': typeof ApiV1WidgetClientIdRoute
   '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
   '/api/v1/widget/$clientId': typeof ApiV1WidgetClientIdRoute
   '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
+  '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
   '/api/v1/widget/$clientId': typeof ApiV1WidgetClientIdRoute
   '/api/v1/accounts/$accountId/token': typeof ApiV1AccountsAccountIdTokenRoute
 }
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
+    | '/api/v1/relay/$relayId'
     | '/api/v1/widget/$clientId'
     | '/api/v1/accounts/$accountId/token'
   fileRoutesByTo: FileRoutesByTo
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
+    | '/api/v1/relay/$relayId'
     | '/api/v1/widget/$clientId'
     | '/api/v1/accounts/$accountId/token'
   id:
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
+    | '/api/v1/relay/$relayId'
     | '/api/v1/widget/$clientId'
     | '/api/v1/accounts/$accountId/token'
   fileRoutesById: FileRoutesById
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   ApiAuthCallbackPlatformRoute: typeof ApiAuthCallbackPlatformRoute
   ApiV1OauthRevokeRoute: typeof ApiV1OauthRevokeRoute
   ApiV1OauthTokenRoute: typeof ApiV1OauthTokenRoute
+  ApiV1RelayRelayIdRoute: typeof ApiV1RelayRelayIdRoute
   ApiV1WidgetClientIdRoute: typeof ApiV1WidgetClientIdRoute
   ApiV1AccountsAccountIdTokenRoute: typeof ApiV1AccountsAccountIdTokenRoute
 }
@@ -499,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1OauthTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/relay/$relayId': {
+      id: '/api/v1/relay/$relayId'
+      path: '/api/v1/relay/$relayId'
+      fullPath: '/api/v1/relay/$relayId'
+      preLoaderRoute: typeof ApiV1RelayRelayIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/widget/$clientId': {
       id: '/api/v1/widget/$clientId'
       path: '/api/v1/widget/$clientId'
@@ -539,6 +559,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthCallbackPlatformRoute: ApiAuthCallbackPlatformRoute,
   ApiV1OauthRevokeRoute: ApiV1OauthRevokeRoute,
   ApiV1OauthTokenRoute: ApiV1OauthTokenRoute,
+  ApiV1RelayRelayIdRoute: ApiV1RelayRelayIdRoute,
   ApiV1WidgetClientIdRoute: ApiV1WidgetClientIdRoute,
   ApiV1AccountsAccountIdTokenRoute: ApiV1AccountsAccountIdTokenRoute,
 }

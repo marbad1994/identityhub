@@ -14,6 +14,8 @@ type Search = {
   state?: string;
   scope?: string;
   method?: string;
+  /** Present when the widget opened this page as a popup. */
+  relay?: string;
 };
 
 const text = (value: unknown) => (typeof value === "string" ? value : undefined);
@@ -22,7 +24,7 @@ const authorizePath = (search: Search) =>
   `/authorize?${new URLSearchParams(Object.entries(search).filter((entry): entry is [string, string] => Boolean(entry[1])))}`;
 
 // The page an app (or its widget) sends people to:
-// /authorize?client_id=...&redirect_uri=...&state=...&scope=profile publish[&method=twitter|password]
+// /authorize?client_id=...&redirect_uri=...&state=...&scope=profile publish[&method=twitter|password][&relay=<id>]
 export const Route = createFileRoute("/authorize")({
   head: () => ({ meta: [{ title: "Sign in · Identity Hub" }] }),
   validateSearch: (search: Record<string, unknown>): Search => ({
@@ -31,6 +33,7 @@ export const Route = createFileRoute("/authorize")({
     state: text(search.state),
     scope: text(search.scope),
     method: text(search.method),
+    relay: text(search.relay),
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
@@ -66,7 +69,12 @@ function Authorize() {
     redirectUri: search.redirect_uri,
     state: search.state,
     scope: search.scope,
+    relay: search.relay,
   };
+  // Opened as a popup by the widget: platform sign-in happens inside this
+  // same window, and the end result goes back to the widget, not to a redirect.
+  const inPopup = Boolean(search.relay);
+  const [done, setDone] = useState(false);
   const here = authorizePath(search);
   const view = consent.ok ? consent.view : null;
   const [selected, setSelected] = useState<string[]>(() => {
@@ -95,20 +103,36 @@ function Authorize() {
   const password = methods.some((method) => method.id === "password");
 
   const finish = async (
-    work: () => Promise<{ ok: true; redirect: string } | { ok: false; error: string }>,
+    work: () => Promise<
+      { ok: true; redirect: string; relayed: boolean } | { ok: false; error: string }
+    >,
   ) => {
     setBusy(true);
     setError(null);
     try {
       const result = await work();
-      if (result.ok) window.location.assign(result.redirect);
-      else setError(result.error);
+      if (!result.ok) setError(result.error);
+      else if (result.relayed) {
+        setDone(true);
+        window.close();
+      } else window.location.assign(result.redirect);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Something went wrong.");
     } finally {
       setBusy(false);
     }
   };
+
+  if (done) {
+    return (
+      <Page width="max-w-lg">
+        <h1 className="text-3xl font-semibold tracking-tight">All done</h1>
+        <p className="mt-3 text-muted">
+          You can close this window and return to {consent.app.name}.
+        </p>
+      </Page>
+    );
+  }
 
   return (
     <Page width="max-w-lg">
@@ -124,6 +148,7 @@ function Authorize() {
               intent="login"
               returnTo={here}
               verb="Continue with"
+              popup={!inPopup}
             />
           ) : null}
           {password ? (
@@ -229,6 +254,7 @@ function Authorize() {
                   intent="connect"
                   returnTo={here}
                   verb="Connect"
+                  popup={!inPopup}
                 />
               </div>
             </details>

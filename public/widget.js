@@ -6,12 +6,15 @@
  *           data-redirect-uri="https://your.app/callback" data-scope="profile" async></script>
  *
  * Renders the sign-in methods the app chose in Identity Hub (fetched live, so
- * changing them there needs no change here). Every method opens the hub's own
- * page: passwords are only ever typed on the hub, never on the host site.
+ * changing them there needs no change here). Every method opens the hub in a
+ * popup: passwords are only ever typed on the hub, never on the host site.
+ * When the person is done, the popup closes and this page goes to the app's
+ * redirect URI with `code` and `state`, exactly like a full-page redirect.
+ * With popups blocked, the widget falls back to that full-page redirect.
  *
- * Before leaving, the widget stores a random `state` in the cookie
- * `ihub_state` on the host site. The app's callback must check that the
- * `state` query parameter equals that cookie before exchanging the code.
+ * The widget stores a random `state` in the cookie `ihub_state` on the host
+ * site. The app's callback must check that the `state` query parameter equals
+ * that cookie before exchanging the code.
  */
 (function () {
   "use strict";
@@ -103,10 +106,38 @@
     return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
+  function openPopup(url) {
+    var width = 520;
+    var height = 720;
+    var left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+    var top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+    return window.open(url, "identity-hub-signin", "popup,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top);
+  }
+
+  /** Poll the hub until the popup finishes; the hub keeps the result under the relay id. */
+  function waitForRelay(options, relay, popup, onDone) {
+    var deadline = Date.now() + 15 * 60 * 1000;
+    function poll() {
+      if (Date.now() > deadline) return;
+      fetch(options.hub + "/api/v1/relay/" + relay, { credentials: "omit", cache: "no-store" })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (body) {
+          if (body.status === "done" && body.location) onDone(body.location);
+          else setTimeout(poll, 1000);
+        })
+        .catch(function () {
+          setTimeout(poll, 2000);
+        });
+    }
+    poll();
+  }
+
   function start(options, method) {
     var state = randomState();
     var secure = location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = "ihub_state=" + state + "; Path=/; Max-Age=600; SameSite=Lax" + secure;
+    document.cookie = "ihub_state=" + state + "; Path=/; Max-Age=900; SameSite=Lax" + secure;
     var params = new URLSearchParams({
       client_id: options.clientId,
       redirect_uri: options.redirectUri,
@@ -114,7 +145,25 @@
       state: state,
       method: method,
     });
-    window.top.location.assign(options.hub + "/authorize?" + params.toString());
+    var relay = randomState();
+    // Must run inside the click handler, before any await, or browsers block it.
+    var popup = openPopup(options.hub + "/authorize?" + params.toString() + "&relay=" + relay);
+    if (!popup) {
+      window.top.location.assign(options.hub + "/authorize?" + params.toString());
+      return;
+    }
+    waitForRelay(options, relay, popup, function (location) {
+      // Only ever follow a result that goes to this app's own redirect URI.
+      var target = new URL(location);
+      var expected = new URL(options.redirectUri);
+      if (target.origin !== expected.origin || target.pathname !== expected.pathname) return;
+      try {
+        popup.close();
+      } catch {
+        // The popup may already be gone.
+      }
+      window.top.location.assign(location);
+    });
   }
 
   function render(root, config, options) {

@@ -3,7 +3,8 @@ import { platformLabel } from "@/lib/platforms";
 import { one, rows, tx } from "./db";
 import { encryptOptional, encryptSecret, pkcePair, randomToken, uid } from "./crypto";
 import { appOrigin } from "./env";
-import { callbackUrl, credentials, platform } from "./platforms";
+import { callbackUrl, credentials, HUB_STATE_PREFIX, platform } from "./platforms";
+import { completeRelay, relayHash, validRelay } from "./relay";
 import type { PlatformLogin } from "./platforms/types";
 import { createSession, type SessionUser } from "./session";
 import { logActivity } from "./activity";
@@ -17,7 +18,8 @@ export function safeReturnTo(value: string | null | undefined, fallback: string)
   return value;
 }
 
-type Redirect = { location: string; setCookie?: string };
+/** Where to send the browser next; `relayed` means a popup finished and should close. */
+type Redirect = { location: string; setCookie?: string; relayed?: boolean };
 
 function withError(path: string, message: string): string {
   const url = new URL(path, appOrigin());
@@ -31,6 +33,8 @@ export async function beginAuthorization(input: {
   intent: "login" | "connect";
   returnTo: string;
   user: SessionUser | null;
+  /** Set when the sign-in runs in a popup opened by a hub page. */
+  relay?: string | null;
 }): Promise<Redirect> {
   const p = platform(input.provider);
   const fallback = input.intent === "connect" ? "/workspace" : "/login";
@@ -43,12 +47,21 @@ export async function beginAuthorization(input: {
   if (input.intent === "connect" && !input.user) return { location: "/login" };
 
   const { verifier, challenge } = pkcePair();
-  const state = randomToken("st_");
+  const state = randomToken(HUB_STATE_PREFIX);
   await rows(`delete from oauth_states where expires_at < now()`);
   await rows(
-    `insert into oauth_states (state, intent, user_id, provider, verifier, return_to, expires_at)
-     values ($1, $2, $3, $4, $5, $6, now() + make_interval(mins => $7))`,
-    [state, input.intent, input.user?.id ?? null, p.id, verifier, input.returnTo, STATE_MINUTES],
+    `insert into oauth_states (state, intent, user_id, provider, verifier, return_to, relay_hash, expires_at)
+     values ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(mins => $8))`,
+    [
+      state,
+      input.intent,
+      input.user?.id ?? null,
+      p.id,
+      verifier,
+      input.returnTo,
+      validRelay(input.relay) ? relayHash(input.relay) : null,
+      STATE_MINUTES,
+    ],
   );
   return { location: p.authorizeUrl({ creds, redirectUri: callbackUrl(p.id), state, challenge }) };
 }
@@ -134,8 +147,10 @@ export async function finishAuthorization(provider: string, request: Request): P
     provider: string;
     verifier: string;
     return_to: string;
+    relay_hash: string | null;
   }>(
-    `delete from oauth_states where state = $1 and expires_at > now() returning intent, user_id, provider, verifier, return_to`,
+    `delete from oauth_states where state = $1 and expires_at > now()
+     returning intent, user_id, provider, verifier, return_to, relay_hash`,
     [state],
   );
   if (!pending || pending.provider !== provider) {
@@ -146,6 +161,24 @@ export async function finishAuthorization(provider: string, request: Request): P
       ),
     };
   }
+  const result = await settle(provider, url, pending, request);
+  if (!pending.relay_hash) return result;
+  // Signed in from a popup: hand the destination to the opener and let the popup close.
+  await completeRelay(pending.relay_hash, result.location);
+  return { ...result, relayed: true };
+}
+
+async function settle(
+  provider: string,
+  url: URL,
+  pending: {
+    intent: "login" | "connect";
+    user_id: string | null;
+    verifier: string;
+    return_to: string;
+  },
+  request: Request,
+): Promise<Redirect> {
   const fallback = pending.intent === "connect" ? "/workspace" : "/login";
   const p = platform(provider);
   const creds = p ? credentials(p) : null;

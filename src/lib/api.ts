@@ -95,6 +95,7 @@ const authorizeRequest = z.object({
   redirectUri: z.string().max(500),
   state: z.string().max(500).optional(),
   scope: z.string().max(100).optional(),
+  relay: z.string().max(100).optional(),
 });
 
 export const fetchConsent = createServerFn({ method: "GET" })

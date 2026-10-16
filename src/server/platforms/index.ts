@@ -41,7 +41,18 @@ export function enabledPlatforms(): PlatformId[] {
   return (Object.keys(REGISTRY) as PlatformId[]).filter((id) => credentials(REGISTRY[id]) !== null);
 }
 
-/** The one callback URL to register with each platform. */
+/**
+ * The redirect URI sent to each platform. By default the hub's own
+ * callback. With PLATFORM_CALLBACK_BASE (e.g.
+ * https://socialpostapi.makketing.com/api/connect) the hub reuses the
+ * callbacks already registered for SocialPostAPI, which forwards any callback
+ * whose state starts with HUB_STATE_PREFIX back to the hub, so no platform
+ * app needs a new redirect URI.
+ */
 export function callbackUrl(id: PlatformId): string {
-  return `${appOrigin()}/api/auth/callback/${id}`;
+  const base = env("PLATFORM_CALLBACK_BASE")?.replace(/\/+$/, "");
+  return base ? `${base}/${id}/callback` : `${appOrigin()}/api/auth/callback/${id}`;
 }
+
+/** Marks the hub's OAuth states so SocialPostAPI's callback can tell them apart. */
+export const HUB_STATE_PREFIX = "ihub_st_";
