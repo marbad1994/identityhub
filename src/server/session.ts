@@ -19,6 +19,16 @@ export function sessionCookieName(): string {
   return secureCookies() ? "__Host-ihub_session" : "ihub_session";
 }
 
+/** Ordinary MFA challenge. Lax, including on http where None is rejected. */
+export function challengeCookieName(): string {
+  return secureCookies() ? "__Host-ihub_mfa" : "ihub_mfa";
+}
+
+/** MFA challenge set from a framed login. Partitioned only on https. */
+export function embedChallengeCookieName(): string {
+  return secureCookies() ? "__Host-ihub_mfa_embed" : "ihub_mfa_embed";
+}
+
 export function readCookie(header: string | null, name: string): string | null {
   for (const part of (header ?? "").split(";")) {
     const [key, ...value] = part.trim().split("=");
@@ -36,6 +46,33 @@ export function serializeCookie(name: string, value: string, maxAgeSeconds: numb
     `Max-Age=${maxAgeSeconds}`,
     ...(secureCookies() ? ["Secure"] : []),
   ].join("; ");
+}
+
+/**
+ * https embed challenge: Partitioned so a Lax clear cannot drop it.
+ * http keeps the Lax serializer; SameSite=None without Secure is rejected.
+ */
+export function serializeEmbedChallenge(value: string, maxAgeSeconds: number): string {
+  const name = embedChallengeCookieName();
+  if (!secureCookies()) return serializeCookie(name, value, maxAgeSeconds);
+  return [
+    `${name}=${value}`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=None",
+    "Partitioned",
+    `Max-Age=${maxAgeSeconds}`,
+  ].join("; ");
+}
+
+/** Canary pair for the https embed document. Not a session. Empty on http. */
+export function embedProbeCookies(): string[] {
+  if (!secureCookies()) return [];
+  return [
+    "ihub_part=1; Path=/; Secure; SameSite=None; Partitioned; Max-Age=900",
+    "ihub_open=1; Path=/; Secure; SameSite=None; Max-Age=900",
+  ];
 }
 
 /** Start a fresh session (never reuse a token across sign-ins) and return its Set-Cookie value. */
@@ -79,11 +116,18 @@ export async function sessionUser(request: Request): Promise<SessionUser | null>
   return { id: row.id, displayName: row.display_name, avatarUrl: row.avatar_url };
 }
 
-/** End the request's session and return the Set-Cookie header that clears it. */
-export async function destroySession(request: Request): Promise<string> {
+/**
+ * End the request's session. One Set-Cookie per cookie: a Lax clear does not
+ * match the partitioned embed challenge.
+ */
+export async function destroySession(request: Request): Promise<string[]> {
   const tokenHash = sessionTokenHash(request);
   if (tokenHash) await rows(`delete from sessions where token_hash = $1`, [tokenHash]);
-  return serializeCookie(sessionCookieName(), "", 0);
+  return [
+    serializeCookie(sessionCookieName(), "", 0),
+    serializeEmbedChallenge("", 0),
+    serializeCookie(challengeCookieName(), "", 0),
+  ];
 }
 
 /** Sign the user out everywhere, optionally keeping one session (the one making the change). */

@@ -2,39 +2,20 @@ import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { approveConsent, denyConsent, fetchConsent } from "@/lib/api";
 import { platformLabel, SCOPES } from "@/lib/platforms";
+import { authorizePath, authorizeSearch, type AuthorizeSearch } from "@/lib/authorize-search";
 import { PlatformIcon } from "@/components/marks";
 import { ErrorNote, Page } from "@/components/shell";
 import { useSession } from "@/lib/session";
 import { PlatformButtons } from "@/components/platform-buttons";
 import { Divider, PasswordLogin } from "@/components/auth-forms";
 
-type Search = {
-  client_id: string;
-  redirect_uri: string;
-  state?: string;
-  scope?: string;
-  method?: string;
-  /** Present when the widget opened this page as a popup. */
-  relay?: string;
-};
-
-const text = (value: unknown) => (typeof value === "string" ? value : undefined);
-
-const authorizePath = (search: Search) =>
-  `/authorize?${new URLSearchParams(Object.entries(search).filter((entry): entry is [string, string] => Boolean(entry[1])))}`;
+type Search = AuthorizeSearch;
 
 // The page an app (or its widget) sends people to:
 // /authorize?client_id=...&redirect_uri=...&state=...&scope=profile publish[&method=twitter|password][&relay=<id>]
 export const Route = createFileRoute("/authorize")({
   head: () => ({ meta: [{ title: "Sign in · Identity Hub" }] }),
-  validateSearch: (search: Record<string, unknown>): Search => ({
-    client_id: text(search.client_id) ?? "",
-    redirect_uri: text(search.redirect_uri) ?? "",
-    state: text(search.state),
-    scope: text(search.scope),
-    method: text(search.method),
-    relay: text(search.relay),
-  }),
+  validateSearch: (search: Record<string, unknown>): Search => authorizeSearch(search),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const consent = await fetchConsent({
@@ -113,6 +94,10 @@ function Authorize() {
       const result = await work();
       if (!result.ok) setError(result.error);
       else if (result.relayed) {
+        window.opener?.postMessage(
+          { source: "identity-hub", v: 1, type: "done" },
+          window.location.origin,
+        );
         setDone(true);
         window.close();
       } else window.location.assign(result.redirect);

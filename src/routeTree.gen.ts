@@ -24,10 +24,17 @@ import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppsIndexRouteImport } from './routes/apps.index'
 import { Route as AppsAppIdRouteImport } from './routes/apps.$appId'
+import { Route as ApiAuthEmbedHandoffRouteImport } from './routes/api/auth/embed-handoff'
+import { Route as ApiAuthEmbedReportRouteImport } from './routes/api/auth/embed-report'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStartRouteImport } from './routes/api/auth/start'
 import { Route as ApiAuthVerifyEmailRouteImport } from './routes/api/auth/verify-email'
 import { Route as ApiV1MeRouteImport } from './routes/api/v1/me'
+import { Route as AppsAppIdIndexRouteImport } from './routes/apps.$appId.index'
+import { Route as AppsAppIdCredentialsRouteImport } from './routes/apps.$appId.credentials'
+import { Route as AppsAppIdGrantsRouteImport } from './routes/apps.$appId.grants'
+import { Route as AppsAppIdMembersRouteImport } from './routes/apps.$appId.members'
+import { Route as AppsAppIdWidgetRouteImport } from './routes/apps.$appId.widget'
 import { Route as ApiAuthCallbackPlatformRouteImport } from './routes/api/auth/callback.$platform'
 import { Route as ApiV1OauthRevokeRouteImport } from './routes/api/v1/oauth/revoke'
 import { Route as ApiV1OauthTokenRouteImport } from './routes/api/v1/oauth/token'
@@ -110,6 +117,16 @@ const AppsAppIdRoute = AppsAppIdRouteImport.update({
   path: '/apps/$appId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthEmbedHandoffRoute = ApiAuthEmbedHandoffRouteImport.update({
+  id: '/api/auth/embed-handoff',
+  path: '/api/auth/embed-handoff',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthEmbedReportRoute = ApiAuthEmbedReportRouteImport.update({
+  id: '/api/auth/embed-report',
+  path: '/api/auth/embed-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
   id: '/api/auth/logout',
   path: '/api/auth/logout',
@@ -129,6 +146,31 @@ const ApiV1MeRoute = ApiV1MeRouteImport.update({
   id: '/api/v1/me',
   path: '/api/v1/me',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppsAppIdIndexRoute = AppsAppIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppsAppIdRoute,
+} as any)
+const AppsAppIdCredentialsRoute = AppsAppIdCredentialsRouteImport.update({
+  id: '/credentials',
+  path: '/credentials',
+  getParentRoute: () => AppsAppIdRoute,
+} as any)
+const AppsAppIdGrantsRoute = AppsAppIdGrantsRouteImport.update({
+  id: '/grants',
+  path: '/grants',
+  getParentRoute: () => AppsAppIdRoute,
+} as any)
+const AppsAppIdMembersRoute = AppsAppIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppsAppIdRoute,
+} as any)
+const AppsAppIdWidgetRoute = AppsAppIdWidgetRouteImport.update({
+  id: '/widget',
+  path: '/widget',
+  getParentRoute: () => AppsAppIdRoute,
 } as any)
 const ApiAuthCallbackPlatformRoute = ApiAuthCallbackPlatformRouteImport.update({
   id: '/api/auth/callback/$platform',
@@ -176,12 +218,19 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/apps/$appId': typeof AppsAppIdRoute
+  '/apps/$appId': typeof AppsAppIdRouteWithChildren
   '/apps/': typeof AppsIndexRoute
+  '/api/auth/embed-handoff': typeof ApiAuthEmbedHandoffRoute
+  '/api/auth/embed-report': typeof ApiAuthEmbedReportRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/v1/me': typeof ApiV1MeRoute
+  '/apps/$appId/credentials': typeof AppsAppIdCredentialsRoute
+  '/apps/$appId/grants': typeof AppsAppIdGrantsRoute
+  '/apps/$appId/members': typeof AppsAppIdMembersRoute
+  '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
+  '/apps/$appId/': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
@@ -203,12 +252,18 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/apps/$appId': typeof AppsAppIdRoute
   '/apps': typeof AppsIndexRoute
+  '/api/auth/embed-handoff': typeof ApiAuthEmbedHandoffRoute
+  '/api/auth/embed-report': typeof ApiAuthEmbedReportRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/v1/me': typeof ApiV1MeRoute
+  '/apps/$appId/credentials': typeof AppsAppIdCredentialsRoute
+  '/apps/$appId/grants': typeof AppsAppIdGrantsRoute
+  '/apps/$appId/members': typeof AppsAppIdMembersRoute
+  '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
+  '/apps/$appId': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
@@ -231,12 +286,19 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/workspace': typeof WorkspaceRoute
   '/api/health': typeof ApiHealthRoute
-  '/apps/$appId': typeof AppsAppIdRoute
+  '/apps/$appId': typeof AppsAppIdRouteWithChildren
   '/apps/': typeof AppsIndexRoute
+  '/api/auth/embed-handoff': typeof ApiAuthEmbedHandoffRoute
+  '/api/auth/embed-report': typeof ApiAuthEmbedReportRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/start': typeof ApiAuthStartRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/v1/me': typeof ApiV1MeRoute
+  '/apps/$appId/credentials': typeof AppsAppIdCredentialsRoute
+  '/apps/$appId/grants': typeof AppsAppIdGrantsRoute
+  '/apps/$appId/members': typeof AppsAppIdMembersRoute
+  '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
+  '/apps/$appId/': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
@@ -262,10 +324,17 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/apps/$appId'
     | '/apps/'
+    | '/api/auth/embed-handoff'
+    | '/api/auth/embed-report'
     | '/api/auth/logout'
     | '/api/auth/start'
     | '/api/auth/verify-email'
     | '/api/v1/me'
+    | '/apps/$appId/credentials'
+    | '/apps/$appId/grants'
+    | '/apps/$appId/members'
+    | '/apps/$appId/widget'
+    | '/apps/$appId/'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
@@ -287,12 +356,18 @@ export interface FileRouteTypes {
     | '/terms'
     | '/workspace'
     | '/api/health'
-    | '/apps/$appId'
     | '/apps'
+    | '/api/auth/embed-handoff'
+    | '/api/auth/embed-report'
     | '/api/auth/logout'
     | '/api/auth/start'
     | '/api/auth/verify-email'
     | '/api/v1/me'
+    | '/apps/$appId/credentials'
+    | '/apps/$appId/grants'
+    | '/apps/$appId/members'
+    | '/apps/$appId/widget'
+    | '/apps/$appId'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
@@ -316,10 +391,17 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/apps/$appId'
     | '/apps/'
+    | '/api/auth/embed-handoff'
+    | '/api/auth/embed-report'
     | '/api/auth/logout'
     | '/api/auth/start'
     | '/api/auth/verify-email'
     | '/api/v1/me'
+    | '/apps/$appId/credentials'
+    | '/apps/$appId/grants'
+    | '/apps/$appId/members'
+    | '/apps/$appId/widget'
+    | '/apps/$appId/'
     | '/api/auth/callback/$platform'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
@@ -342,8 +424,10 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   WorkspaceRoute: typeof WorkspaceRoute
   ApiHealthRoute: typeof ApiHealthRoute
-  AppsAppIdRoute: typeof AppsAppIdRoute
+  AppsAppIdRoute: typeof AppsAppIdRouteWithChildren
   AppsIndexRoute: typeof AppsIndexRoute
+  ApiAuthEmbedHandoffRoute: typeof ApiAuthEmbedHandoffRoute
+  ApiAuthEmbedReportRoute: typeof ApiAuthEmbedReportRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStartRoute: typeof ApiAuthStartRoute
   ApiAuthVerifyEmailRoute: typeof ApiAuthVerifyEmailRoute
@@ -463,6 +547,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppsAppIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/embed-handoff': {
+      id: '/api/auth/embed-handoff'
+      path: '/api/auth/embed-handoff'
+      fullPath: '/api/auth/embed-handoff'
+      preLoaderRoute: typeof ApiAuthEmbedHandoffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/embed-report': {
+      id: '/api/auth/embed-report'
+      path: '/api/auth/embed-report'
+      fullPath: '/api/auth/embed-report'
+      preLoaderRoute: typeof ApiAuthEmbedReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/logout': {
       id: '/api/auth/logout'
       path: '/api/auth/logout'
@@ -490,6 +588,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/v1/me'
       preLoaderRoute: typeof ApiV1MeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/apps/$appId/': {
+      id: '/apps/$appId/'
+      path: '/'
+      fullPath: '/apps/$appId/'
+      preLoaderRoute: typeof AppsAppIdIndexRouteImport
+      parentRoute: typeof AppsAppIdRoute
+    }
+    '/apps/$appId/credentials': {
+      id: '/apps/$appId/credentials'
+      path: '/credentials'
+      fullPath: '/apps/$appId/credentials'
+      preLoaderRoute: typeof AppsAppIdCredentialsRouteImport
+      parentRoute: typeof AppsAppIdRoute
+    }
+    '/apps/$appId/grants': {
+      id: '/apps/$appId/grants'
+      path: '/grants'
+      fullPath: '/apps/$appId/grants'
+      preLoaderRoute: typeof AppsAppIdGrantsRouteImport
+      parentRoute: typeof AppsAppIdRoute
+    }
+    '/apps/$appId/members': {
+      id: '/apps/$appId/members'
+      path: '/members'
+      fullPath: '/apps/$appId/members'
+      preLoaderRoute: typeof AppsAppIdMembersRouteImport
+      parentRoute: typeof AppsAppIdRoute
+    }
+    '/apps/$appId/widget': {
+      id: '/apps/$appId/widget'
+      path: '/widget'
+      fullPath: '/apps/$appId/widget'
+      preLoaderRoute: typeof AppsAppIdWidgetRouteImport
+      parentRoute: typeof AppsAppIdRoute
     }
     '/api/auth/callback/$platform': {
       id: '/api/auth/callback/$platform'
@@ -536,6 +669,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppsAppIdRouteChildren {
+  AppsAppIdCredentialsRoute: typeof AppsAppIdCredentialsRoute
+  AppsAppIdGrantsRoute: typeof AppsAppIdGrantsRoute
+  AppsAppIdMembersRoute: typeof AppsAppIdMembersRoute
+  AppsAppIdWidgetRoute: typeof AppsAppIdWidgetRoute
+  AppsAppIdIndexRoute: typeof AppsAppIdIndexRoute
+}
+
+const AppsAppIdRouteChildren: AppsAppIdRouteChildren = {
+  AppsAppIdCredentialsRoute: AppsAppIdCredentialsRoute,
+  AppsAppIdGrantsRoute: AppsAppIdGrantsRoute,
+  AppsAppIdMembersRoute: AppsAppIdMembersRoute,
+  AppsAppIdWidgetRoute: AppsAppIdWidgetRoute,
+  AppsAppIdIndexRoute: AppsAppIdIndexRoute,
+}
+
+const AppsAppIdRouteWithChildren = AppsAppIdRoute._addFileChildren(
+  AppsAppIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthorizeRoute: AuthorizeRoute,
@@ -550,8 +703,10 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   WorkspaceRoute: WorkspaceRoute,
   ApiHealthRoute: ApiHealthRoute,
-  AppsAppIdRoute: AppsAppIdRoute,
+  AppsAppIdRoute: AppsAppIdRouteWithChildren,
   AppsIndexRoute: AppsIndexRoute,
+  ApiAuthEmbedHandoffRoute: ApiAuthEmbedHandoffRoute,
+  ApiAuthEmbedReportRoute: ApiAuthEmbedReportRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStartRoute: ApiAuthStartRoute,
   ApiAuthVerifyEmailRoute: ApiAuthVerifyEmailRoute,

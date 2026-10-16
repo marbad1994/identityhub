@@ -28,9 +28,13 @@ import {
 } from "./password";
 import { clear, hit, peek } from "./rate-limit";
 import {
+  challengeCookieName,
   createSession,
+  embedChallengeCookieName,
+  readCookie,
   revokeSessions,
   serializeCookie,
+  serializeEmbedChallenge,
   countSessions,
   type SessionUser,
 } from "./session";
@@ -45,7 +49,12 @@ import {
 import { logActivity } from "./activity";
 import { safeReturnTo } from "./oauth";
 
-export type Ctx = { ip: string; userAgent: string | null; sessionTokenHash: string | null };
+export type Ctx = {
+  ip: string;
+  userAgent: string | null;
+  sessionTokenHash: string | null;
+  cookieHeader?: string | null;
+};
 type Fail = { ok: false; error: string };
 
 const CHECK_EMAIL = "Check your email. If the address can be used, we sent a link to continue.";
@@ -61,9 +70,7 @@ const tooMany = (seconds: number): Fail => ({
   error: `Too many attempts. Try again in ${minutes(seconds)} minute${minutes(seconds) === 1 ? "" : "s"}.`,
 });
 
-export function challengeCookieName(): string {
-  return secureCookies() ? "__Host-ihub_mfa" : "ihub_mfa";
-}
+export { challengeCookieName, embedChallengeCookieName };
 
 type UserRow = {
   id: string;
@@ -250,10 +257,51 @@ export async function confirmEmail(
 export type LoginResult =
   | { ok: true; redirect: string; setCookies: string[] }
   | { ok: true; mfaRequired: true; setCookies: string[] }
+  | { ok: true; handoff: string }
+  | { ok: true; embedUnavailable: true }
   | Fail;
 
+const HANDOFF_SECONDS = 60;
+
+async function issueHandoff(userId: string, returnTo: string): Promise<string> {
+  const token = randomToken("eh_");
+  await rows(
+    `insert into embed_handoffs (token_hash, user_id, return_to, expires_at)
+     values ($1, $2, $3, now() + make_interval(secs => $4))`,
+    [sha256(token), userId, returnTo, HANDOFF_SECONDS],
+  );
+  return token;
+}
+
+/**
+ * https: ihub_part is the Partitioned canary. ihub_open alone means Partitioned
+ * was dropped. http has no probe; Lax is enough.
+ */
+function embedMfaAvailable(cookieHeader: string | null | undefined): boolean {
+  if (!secureCookies()) return true;
+  return Boolean(readCookie(cookieHeader ?? null, "ihub_part"));
+}
+
+/** Single-use Lax session for the consent window. Replay fails closed. */
+export async function redeemEmbedHandoff(
+  token: string,
+  ctx: Ctx,
+): Promise<{ location: string; setCookie?: string }> {
+  const expired = `/login?error=${encodeURIComponent("That link expired or was already used.")}`;
+  if (!token) return { location: expired };
+  const row = await one<{ user_id: string; return_to: string }>(
+    `delete from embed_handoffs where token_hash = $1 and expires_at > now() returning user_id, return_to`,
+    [sha256(token)],
+  );
+  if (!row) return { location: expired };
+  return {
+    location: safeReturnTo(row.return_to, "/login"),
+    setCookie: await createSession(row.user_id, ctx.userAgent),
+  };
+}
+
 export async function login(
-  input: { email: string; password: string; returnTo: string },
+  input: { email: string; password: string; returnTo: string; embed?: boolean },
   ctx: Ctx,
 ): Promise<LoginResult> {
   const ipLimit = await hit(`login:ip:${ctx.ip}`, 30, 900);
@@ -279,23 +327,26 @@ export async function login(
       await hashPassword(input.password),
     ]);
   }
-  const returnTo = safeReturnTo(input.returnTo, "/workspace");
+  const returnTo = safeReturnTo(input.returnTo, input.embed ? "/login" : "/workspace");
 
   if (user.mfa_enabled_at) {
+    if (input.embed && !embedMfaAvailable(ctx.cookieHeader)) {
+      return { ok: true, embedUnavailable: true };
+    }
     const token = randomToken("ch_");
     await rows(`delete from login_challenges where expires_at < now()`);
     await rows(
       `insert into login_challenges (token_hash, user_id, return_to, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
       [sha256(token), user.id, returnTo, CHALLENGE_MINUTES],
     );
-    return {
-      ok: true,
-      mfaRequired: true,
-      setCookies: [serializeCookie(challengeCookieName(), token, CHALLENGE_MINUTES * 60)],
-    };
+    const challenge = input.embed
+      ? serializeEmbedChallenge(token, CHALLENGE_MINUTES * 60)
+      : serializeCookie(challengeCookieName(), token, CHALLENGE_MINUTES * 60);
+    return { ok: true, mfaRequired: true, setCookies: [challenge] };
   }
 
   await logActivity(user.id, "Signed in", "With email and password");
+  if (input.embed) return { ok: true, handoff: await issueHandoff(user.id, returnTo) };
   return {
     ok: true,
     redirect: returnTo,
@@ -304,10 +355,14 @@ export async function login(
 }
 
 export async function loginSecondFactor(
-  input: { code: string },
+  input: { code: string; embed?: boolean },
   challengeToken: string | null,
   ctx: Ctx,
-): Promise<{ ok: true; redirect: string; setCookies: string[] } | Fail> {
+): Promise<
+  | { ok: true; redirect: string; setCookies: string[] }
+  | { ok: true; handoff: string; setCookies: string[] }
+  | Fail
+> {
   const expired: Fail = { ok: false, error: "This sign-in expired. Start again." };
   if (!challengeToken) return expired;
   const challenge = await one<{ user_id: string; return_to: string; attempts: number }>(
@@ -360,6 +415,13 @@ export async function loginSecondFactor(
       "A recovery code was used",
       "A recovery code was used to sign in to your Identity Hub account.",
     );
+  }
+  if (input.embed) {
+    return {
+      ok: true,
+      handoff: await issueHandoff(user.id, safeReturnTo(challenge.return_to, "/login")),
+      setCookies: [serializeEmbedChallenge("", 0), serializeCookie(challengeCookieName(), "", 0)],
+    };
   }
   return {
     ok: true,

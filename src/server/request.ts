@@ -14,6 +14,7 @@ export function requestContext(request: Request = getRequest()): Ctx {
     ip: clientIp(getRequestIP(), request.headers.get("x-forwarded-for")),
     userAgent: request.headers.get("user-agent"),
     sessionTokenHash: sessionTokenHash(request),
+    cookieHeader: request.headers.get("cookie"),
   };
 }
 

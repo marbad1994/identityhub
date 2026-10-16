@@ -1,7 +1,16 @@
-import { useId, useState, type FormEvent, type InputHTMLAttributes } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type InputHTMLAttributes,
+} from "react";
 import { Link } from "@tanstack/react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { logIn, logInSecondFactor } from "@/lib/api";
+import { openPopup } from "@/lib/popup";
+import { postEmbed, reportEmbed } from "./embed-bridge";
 import { ErrorNote } from "./shell";
 
 export const inputClass = "mt-1 w-full min-h-11 rounded-xl border border-line bg-bg px-3 text-base";
@@ -56,25 +65,108 @@ export function PasswordField({
 export const NEW_PASSWORD_HINT =
   "At least 15 characters. Any characters work, including spaces; a few unrelated words are easy to remember. Passwords found in data breaches are refused.";
 
+const CODE_RETRY = new Set([
+  "That code is not valid.",
+  "That code was already used. Wait for the next one.",
+]);
+
+type LoginOutcome =
+  | {
+      ok: true;
+      redirect?: string;
+      mfaRequired?: true;
+      handoff?: string;
+      embedUnavailable?: true;
+    }
+  | { ok: false; error: string };
+
 /** Email + password sign-in, with the authenticator step when the account has two-factor on. */
-export function PasswordLogin({ returnTo }: { returnTo: string }) {
+export function PasswordLogin({
+  returnTo,
+  embed = false,
+  parentOrigin,
+  parentAllowed = false,
+}: {
+  returnTo: string;
+  embed?: boolean;
+  parentOrigin?: string;
+  parentAllowed?: boolean;
+}) {
   const [step, setStep] = useState<"password" | "code">("password");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const popupRef = useRef<Window | null>(null);
+
+  useEffect(() => {
+    if (!embed) return;
+    const close = () => popupRef.current?.close();
+    window.addEventListener("pagehide", close);
+    return () => {
+      window.removeEventListener("pagehide", close);
+      popupRef.current?.close();
+    };
+  }, [embed]);
+
+  const blocked = () => {
+    reportEmbed("popup-blocked");
+    postEmbed(parentOrigin, parentAllowed, "popup-blocked");
+  };
 
   const run = async (
-    work: () => Promise<
-      { ok: true; redirect?: string; mfaRequired?: true } | { ok: false; error: string }
-    >,
+    work: () => Promise<LoginOutcome>,
+    popup: Window | null,
+    fromCode: boolean,
   ) => {
     setBusy(true);
     setError(null);
     try {
       const result = await work();
-      if (!result.ok) setError(result.error);
-      else if (result.mfaRequired) setStep("code");
-      else if (result.redirect) window.location.assign(result.redirect);
+      if (!embed) {
+        if (!result.ok) setError(result.error);
+        else if (result.mfaRequired) setStep("code");
+        else if (result.redirect) window.location.assign(result.redirect);
+        return;
+      }
+      if (!result.ok) {
+        const retry = fromCode && CODE_RETRY.has(result.error);
+        if (!retry) {
+          popup?.close();
+          popupRef.current = null;
+          if (fromCode) setStep("password");
+        }
+        setError(result.error);
+        return;
+      }
+      if (result.embedUnavailable) {
+        popup?.close();
+        popupRef.current = null;
+        reportEmbed("cookies-blocked");
+        postEmbed(parentOrigin, parentAllowed, "cookies-blocked");
+        return;
+      }
+      if (result.mfaRequired) {
+        setStep("code");
+        return;
+      }
+      if (result.handoff) {
+        try {
+          if (!popup || popup.closed) {
+            blocked();
+            return;
+          }
+          popup.location.href = `/api/auth/embed-handoff?token=${encodeURIComponent(result.handoff)}`;
+        } catch {
+          blocked();
+        }
+        return;
+      }
+      popup?.close();
+      popupRef.current = null;
+      if (result.redirect) window.location.assign(result.redirect);
     } catch {
+      popup?.close();
+      popupRef.current = null;
+      if (fromCode) setStep("password");
       setError("Something went wrong. Try again.");
     } finally {
       setBusy(false);
@@ -84,22 +176,50 @@ export function PasswordLogin({ returnTo }: { returnTo: string }) {
   const submitPassword = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    void run(() =>
-      logIn({
-        data: {
-          email: String(form.get("email") ?? ""),
-          password: String(form.get("password") ?? ""),
-          returnTo,
-        },
-      }),
+    let popup: Window | null = null;
+    if (embed) {
+      popup = openPopup(`${window.location.origin}/login?embed_wait=1`);
+      if (!popup) {
+        blocked();
+        return;
+      }
+      popupRef.current = popup;
+    }
+    void run(
+      () =>
+        logIn({
+          data: {
+            email: String(form.get("email") ?? ""),
+            password: String(form.get("password") ?? ""),
+            returnTo,
+            ...(embed ? { embed: true } : {}),
+          },
+        }),
+      popup,
+      false,
     );
   };
 
   const submitCode = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    void run(() => logInSecondFactor({ data: { code: String(form.get("code") ?? "") } }));
+    void run(
+      () =>
+        logInSecondFactor({
+          data: { code: String(form.get("code") ?? ""), ...(embed ? { embed: true } : {}) },
+        }),
+      popupRef.current,
+      true,
+    );
   };
+
+  const linkSearch = embed
+    ? {
+        return_to: returnTo,
+        embed: 1 as const,
+        ...(parentOrigin ? { parent_origin: parentOrigin } : {}),
+      }
+    : { return_to: returnTo };
 
   if (step === "code") {
     return (
@@ -152,14 +272,14 @@ export function PasswordLogin({ returnTo }: { returnTo: string }) {
       </button>
       <ErrorNote message={error} />
       <p className="flex flex-wrap justify-between gap-2 text-sm">
-        <Link to="/forgot-password" className="text-link no-underline hover:underline">
-          Forgot password?
-        </Link>
         <Link
-          to="/signup"
-          search={{ return_to: returnTo }}
+          to="/forgot-password"
+          search={linkSearch}
           className="text-link no-underline hover:underline"
         >
+          Forgot password?
+        </Link>
+        <Link to="/signup" search={linkSearch} className="text-link no-underline hover:underline">
           Create an account
         </Link>
       </p>

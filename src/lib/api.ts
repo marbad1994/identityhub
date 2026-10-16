@@ -137,17 +137,52 @@ export const fetchDeveloperApp = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .validator(z.object({ appId: z.string().max(64) }))
   .handler(async ({ context, data }) => {
-    const { getDeveloperApp } = await import("@/server/workspace");
+    const { appSummary, getDeveloperApp } = await import("@/server/workspace");
     const { availableMethods } = await import("@/server/methods");
     const { appOrigin } = await import("@/server/env");
     const app = await getDeveloperApp(context.user.id, data.appId);
-    const { listAppMembers } = await import("@/server/workspace");
     return {
       app,
-      members: app ? await listAppMembers(context.user.id, data.appId) : [],
       available: availableMethods(),
       hubOrigin: appOrigin(),
+      summary: app ? await appSummary(context.user.id, data.appId) : null,
     };
+  });
+
+export const fetchAppMembers = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ appId: z.string().max(64) }))
+  .handler(async ({ context, data }) => {
+    const { listAppMembers } = await import("@/server/workspace");
+    return listAppMembers(context.user.id, data.appId);
+  });
+
+export const fetchRecentMembers = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ appId: z.string().max(64) }))
+  .handler(async ({ context, data }) => {
+    const { listRecentMembers } = await import("@/server/workspace");
+    return listRecentMembers(context.user.id, data.appId);
+  });
+
+export const fetchAppGrants = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .validator(z.object({ appId: z.string().max(64) }))
+  .handler(async ({ context, data }) => {
+    const { listAppGrants } = await import("@/server/workspace");
+    return listAppGrants(context.user.id, data.appId);
+  });
+
+export const fetchEmbedParent = createServerFn({ method: "GET" })
+  .validator(
+    z.object({
+      returnTo: z.string().max(4000).optional(),
+      parentOrigin: z.string().max(300).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { embedParentStatus } = await import("@/server/frame-ancestors");
+    return embedParentStatus(data.returnTo, data.parentOrigin);
   });
 
 export const removeAppMember = createServerFn({ method: "POST" })
@@ -195,12 +230,16 @@ export const signUp = createServerFn({ method: "POST" })
   });
 
 export const logIn = createServerFn({ method: "POST" })
-  .validator(z.object({ email, password, returnTo: z.string().max(2000) }))
+  .validator(
+    z.object({ email, password, returnTo: z.string().max(2000), embed: z.boolean().optional() }),
+  )
   .handler(async ({ data }) => {
     const { login } = await import("@/server/password-auth");
     const { ctx, setCookies } = await withContext();
     const result = await login(data, ctx);
     if (!result.ok) return result;
+    if ("embedUnavailable" in result) return { ok: true as const, embedUnavailable: true as const };
+    if ("handoff" in result) return { ok: true as const, handoff: result.handoff };
     setCookies(result.setCookies);
     return "mfaRequired" in result
       ? { ok: true as const, mfaRequired: true as const }
@@ -208,14 +247,18 @@ export const logIn = createServerFn({ method: "POST" })
   });
 
 export const logInSecondFactor = createServerFn({ method: "POST" })
-  .validator(z.object({ code: z.string().max(40) }))
+  .validator(z.object({ code: z.string().max(40), embed: z.boolean().optional() }))
   .handler(async ({ data }) => {
-    const { loginSecondFactor, challengeCookieName } = await import("@/server/password-auth");
+    const { loginSecondFactor, challengeCookieName, embedChallengeCookieName } =
+      await import("@/server/password-auth");
     const { getCookie } = await import("@tanstack/react-start/server");
     const { ctx, setCookies } = await withContext();
-    const result = await loginSecondFactor(data, getCookie(challengeCookieName()) ?? null, ctx);
+    const challenge =
+      getCookie(challengeCookieName()) ?? getCookie(embedChallengeCookieName()) ?? null;
+    const result = await loginSecondFactor(data, challenge, ctx);
     if (!result.ok) return result;
     setCookies(result.setCookies);
+    if ("handoff" in result) return { ok: true as const, handoff: result.handoff };
     return { ok: true as const, redirect: result.redirect };
   });
 

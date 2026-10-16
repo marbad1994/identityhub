@@ -1,10 +1,42 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { canonicalAuthUrl } from "./server/auth-origin";
 import { appOrigin } from "./server/env";
+import { lookupFrameApp } from "./server/frame-ancestors";
+import { embedProbeCookies } from "./server/session";
 
 /** Public endpoints other sites load (the widget's config); they need CORS and cross-origin CORP. */
 const isPublicApi = (pathname: string) =>
   pathname.startsWith("/api/v1/widget/") || pathname.startsWith("/api/v1/relay/");
+
+const CREDENTIAL_PATHS = new Set(["/login", "/signup", "/forgot-password"]);
+
+type FramePolicy = { ancestors: string; frame: boolean };
+
+/** Fail closed. A thrown lookup must still send DENY, not a 500 that skips it. */
+async function framePolicy(request: Request): Promise<FramePolicy> {
+  const deny: FramePolicy = { ancestors: "'none'", frame: false };
+  const url = new URL(request.url);
+  if (!CREDENTIAL_PATHS.has(url.pathname)) return deny;
+  const embed = url.searchParams.get("embed");
+  if (embed !== "1") {
+    if (embed !== null) console.info(`[frame] client_id= path=${url.pathname} reason=no_embed`);
+    return deny;
+  }
+  try {
+    const found = await lookupFrameApp(url.searchParams.get("return_to"));
+    if (!found.ok) {
+      console.info(
+        `[frame] client_id=${found.clientId ?? ""} path=${url.pathname} reason=${found.reason}`,
+      );
+      return deny;
+    }
+    return { ancestors: found.origins.join(" "), frame: true };
+  } catch (error) {
+    console.info(`[frame] client_id= path=${url.pathname} reason=lookup_failed`);
+    console.error("[frame]", error instanceof Error ? error.message : error);
+    return deny;
+  }
+}
 
 /**
  * Security headers on every response, with a fresh CSP nonce per request.
@@ -23,6 +55,7 @@ const securityHeaders = createMiddleware().server(async ({ next, request }) => {
   const result = await next({ context: { nonce } });
   const headers = result.response.headers;
   const url = new URL(request.url);
+  const framing = await framePolicy(request);
   const set = (name: string, value: string) => {
     if (!headers.has(name)) headers.set(name, value);
   };
@@ -38,11 +71,13 @@ const securityHeaders = createMiddleware().server(async ({ next, request }) => {
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      `frame-ancestors ${framing.ancestors}`,
     ].join("; "),
   );
   set("X-Content-Type-Options", "nosniff");
-  set("X-Frame-Options", "DENY");
+  // Credential embeds omit this: modern browsers need the CSP allowlist alone.
+  // /authorize keeps DENY, including when embed=1 is present.
+  if (!framing.frame) set("X-Frame-Options", "DENY");
   set("Referrer-Policy", "strict-origin-when-cross-origin");
   set(
     "Permissions-Policy",
@@ -54,7 +89,13 @@ const securityHeaders = createMiddleware().server(async ({ next, request }) => {
   // still close itself at the end.
   const inPopupFlow = url.pathname === "/authorize" || url.pathname.startsWith("/api/auth/");
   set("Cross-Origin-Opener-Policy", inPopupFlow ? "unsafe-none" : "same-origin-allow-popups");
-  set("Cross-Origin-Resource-Policy", isPublicApi(url.pathname) ? "cross-origin" : "same-origin");
+  set(
+    "Cross-Origin-Resource-Policy",
+    isPublicApi(url.pathname) || framing.frame ? "cross-origin" : "same-origin",
+  );
+  if (framing.frame) {
+    for (const probe of embedProbeCookies()) headers.append("set-cookie", probe);
+  }
   // HSTS only means something on https; the public IP port serves plain http.
   if ((request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "")) === "https") {
     set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");

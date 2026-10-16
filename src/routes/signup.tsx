@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { signUp } from "@/lib/api";
+import { fetchEmbedParent, signUp } from "@/lib/api";
+import { EmbedBridge } from "@/components/embed-bridge";
 import { ErrorNote, Page, SuccessNote } from "@/components/shell";
+import { credentialFlags } from "@/lib/authorize-search";
 import {
   NEW_PASSWORD_HINT,
   PasswordField,
@@ -11,14 +13,34 @@ import {
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create an account · Identity Hub" }] }),
-  validateSearch: (search: Record<string, unknown>): { return_to?: string } => ({
-    return_to: typeof search.return_to === "string" ? search.return_to : undefined,
+  validateSearch: (search: Record<string, unknown>) => credentialFlags(search),
+  loaderDeps: ({ search }) => ({
+    returnTo: search.return_to,
+    parentOrigin: search.parent_origin,
+    embed: search.embed,
   }),
+  loader: ({ deps }) =>
+    deps.embed === 1
+      ? fetchEmbedParent({ data: { returnTo: deps.returnTo, parentOrigin: deps.parentOrigin } })
+      : Promise.resolve({ allowed: false, appName: null as string | null }),
   component: SignUp,
 });
 
 function SignUp() {
-  const { return_to: returnTo = "/workspace" } = Route.useSearch();
+  const {
+    return_to: returnTo = "/workspace",
+    embed: embedFlag,
+    parent_origin: parentOrigin,
+  } = Route.useSearch();
+  const parent = Route.useLoaderData();
+  const embed = embedFlag === 1;
+  const linkSearch = embed
+    ? {
+        return_to: returnTo,
+        embed: 1 as const,
+        ...(parentOrigin ? { parent_origin: parentOrigin } : {}),
+      }
+    : { return_to: returnTo };
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +69,10 @@ function SignUp() {
   };
 
   return (
-    <Page width="max-w-lg">
+    <Page width="max-w-lg" embed={embed}>
+      {embed ? (
+        <EmbedBridge parentOrigin={parentOrigin} allowed={parent.allowed} dismissOnEscape />
+      ) : null}
       <h1 className="text-4xl font-semibold tracking-tight">Create an account</h1>
       {sent ? (
         <SuccessNote message={sent} />
@@ -85,11 +110,7 @@ function SignUp() {
       )}
       <p className="mt-6 text-sm text-muted">
         Already have an account?{" "}
-        <Link
-          to="/login"
-          search={{ return_to: returnTo }}
-          className="text-link no-underline hover:underline"
-        >
+        <Link to="/login" search={linkSearch} className="text-link no-underline hover:underline">
           Sign in
         </Link>
       </p>

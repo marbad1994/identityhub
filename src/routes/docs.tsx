@@ -56,16 +56,17 @@ function Docs() {
         data-scope="profile" async></script>`}</Code>
         <p>
           Visitors see one Sign in button. Opening it lists each sign-in method you turned on, plus
-          Sign up with email. Each of those opens the hub in a popup: passwords are only ever typed on
-          Identity Hub, never on your site. When the person is done the popup closes and your page
-          goes to your
-          redirect URI with code and state, exactly as a full-page redirect would (which is what
-          happens if popups are blocked). Before leaving, the widget stores a random state in the
-          cookie <strong>ihub_state</strong> on your site. Your callback must check that the state
-          query parameter equals that cookie, then continue with step 3. The widget's styles live in
-          a shadow root and use a constructed stylesheet, so they neither leak into your page nor
-          need <strong>style-src 'unsafe-inline'</strong> in your CSP; allow the hub origin in{" "}
-          <strong>script-src</strong> and <strong>connect-src</strong>.
+          Sign up with email. The widget opens Identity Hub credential pages in a frame. Passwords
+          are typed on the hub, never on your site. Allow and Deny run in a top-level hub window,
+          not in the frame. When the person is done, your page goes to your redirect URI with code
+          and state. If the frame cannot be shown, the widget offers a button that continues on the
+          hub. Before leaving, the widget stores a random state in the cookie{" "}
+          <strong>ihub_state</strong> on your site. Your callback must check that the state query
+          parameter equals that cookie, then continue with step 3. The widget's styles live in a
+          shadow root and use a constructed stylesheet, so they neither leak into your page nor need{" "}
+          <strong>style-src 'unsafe-inline'</strong> in your CSP. Allow the hub origin in{" "}
+          <strong>script-src</strong>, <strong>connect-src</strong> (the widget config and the relay
+          poll), and <strong>frame-src</strong>.
         </p>
       </Step>
 
@@ -187,7 +188,10 @@ token=ihub_at_...&client_id=ihub_pk_...&client_secret=ihub_sk_...`}</Code>
           </li>
           <li>
             Sessions use a __Host- cookie (HttpOnly, Secure, SameSite=Lax) with idle and absolute
-            timeouts; every page sends a nonce-based Content-Security-Policy and refuses framing.
+            timeouts. Account and developer pages, /authorize, and /reset-password send
+            frame-ancestors 'none'. A login, signup, or forgot-password page with embed=1 may be
+            framed by a registered homepage or redirect origin. Every page sends a nonce-based
+            Content-Security-Policy.
           </li>
         </ul>
       </Step>

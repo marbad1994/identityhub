@@ -18,6 +18,7 @@ export function housekeeping(): void {
       );
       await rows(`delete from email_tokens where expires_at < now() - interval '1 day'`);
       await rows(`delete from login_challenges where expires_at < now()`);
+      await rows(`delete from embed_handoffs where expires_at < now()`);
       await rows(`delete from oauth_states where expires_at < now()`);
       await rows(`delete from auth_relays where expires_at < now()`);
       await rows(`delete from auth_codes where expires_at < now() - interval '1 day'`);

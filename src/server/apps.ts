@@ -19,7 +19,7 @@ import { logActivity } from "./activity";
 import { listAccounts, type AccountView, type Result } from "./workspace";
 import { effectiveMethods, type MethodView } from "./methods";
 import { completeRelay, relayHash, validRelay } from "./relay";
-import { appOrigin } from "./env";
+import { appOrigin, env } from "./env";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -52,6 +52,8 @@ export async function widgetConfig(clientId: string) {
     theme: app.widget_theme,
     methods: effectiveMethods(app.sign_in_methods),
     redirect_uris: app.redirect_uris,
+    // WIDGET_MODAL=0 is the popup escape hatch. Unset stays the frame.
+    presentation: env("WIDGET_MODAL") === "0" ? ("popup" as const) : ("modal" as const),
   };
 }
 

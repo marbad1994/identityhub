@@ -9,6 +9,8 @@ import { one, rows, tx } from "./db";
 import { randomToken, sha256, uid } from "./crypto";
 import { effectiveMethods, isMethod, type MethodView } from "./methods";
 import { logActivity } from "./activity";
+import type { Queryable } from "./db";
+import { forgetFrameAncestors } from "./frame-ancestors";
 import type { SessionUser } from "./session";
 
 export type AccountView = {
@@ -48,6 +50,21 @@ export type DeveloperAppView = {
   /** What the widget shows today. */
   methods: MethodView[];
   widgetTheme: "light" | "dark";
+};
+
+export type DeveloperAppListItem = DeveloperAppView & { memberCount: number };
+
+export type AppSummary = { memberCount: number; lastUsedAt: string | null };
+
+export type AppGrantView = {
+  kind: "grant" | "token";
+  at: string;
+  displayName: string;
+  provider: string | null;
+  handle: string | null;
+  scopes: string | null;
+  /** Token rows: whether last_used_at was set. Grant rows are always the latest consent. */
+  used: boolean;
 };
 
 export type ActivityView = { id: string; action: string; detail: string; at: string };
@@ -188,7 +205,7 @@ export async function createApp(
     `select count(*)::int as n from apps where owner_id = $1`,
     [userId],
   );
-  if ((count?.n ?? 0) >= 25)
+  if ((count?.n ?? 0) >= APP_CAP)
     return { ok: false, error: "This account already owns the maximum of 25 apps." };
   const appId = uid();
   const clientId = randomToken("ihub_pk_");
@@ -215,11 +232,13 @@ export async function updateApp(
       ok: false,
       error: "Add one to ten https redirect URIs, one per line, without a #fragment.",
     };
-  const updated = await one(
-    `update apps set name = $3, homepage_url = $4, redirect_uris = $5 where id = $1 and owner_id = $2 returning id`,
+  const updated = await one<{ client_id: string }>(
+    `update apps set name = $3, homepage_url = $4, redirect_uris = $5 where id = $1 and owner_id = $2 returning client_id`,
     [input.appId, userId, name, input.homepageUrl.trim(), redirectUris],
   );
-  return updated ? { ok: true } : { ok: false, error: "That app is not yours." };
+  if (!updated) return { ok: false, error: "That app is not yours." };
+  forgetFrameAncestors(updated.client_id);
+  return { ok: true };
 }
 
 export async function rotateAppSecret(
@@ -237,11 +256,12 @@ export async function rotateAppSecret(
 }
 
 export async function deleteApp(userId: string, appId: string): Promise<Result> {
-  const removed = await one<{ name: string }>(
-    `delete from apps where id = $1 and owner_id = $2 returning name`,
+  const removed = await one<{ name: string; client_id: string }>(
+    `delete from apps where id = $1 and owner_id = $2 returning name, client_id`,
     [appId, userId],
   );
   if (!removed) return { ok: false, error: "That app is not yours." };
+  forgetFrameAncestors(removed.client_id);
   await logActivity(
     userId,
     "App deleted",
@@ -266,6 +286,9 @@ type AppRow = {
   widget_theme: "light" | "dark";
 };
 
+/** Same ceiling as the error string from createApp. */
+export const APP_CAP = 25;
+
 const APP_COLUMNS = `id, name, homepage_url, redirect_uris, client_id, created_at, sign_in_methods, widget_theme`;
 
 function appView(app: AppRow): DeveloperAppView {
@@ -282,12 +305,46 @@ function appView(app: AppRow): DeveloperAppView {
   };
 }
 
-export async function listDeveloperApps(userId: string): Promise<DeveloperAppView[]> {
+export async function listDeveloperApps(userId: string): Promise<DeveloperAppListItem[]> {
   const apps = await rows<AppRow>(
     `select ${APP_COLUMNS} from apps where owner_id = $1 order by created_at`,
     [userId],
   );
-  return apps.map(appView);
+  if (apps.length === 0) return [];
+  const counts = await rows<{ app_id: string; member_count: number }>(
+    `select app_id, count(distinct user_id)::int as member_count
+     from (
+       select app_id, user_id from app_grants
+       union
+       select app_id, user_id from app_tokens
+     ) s
+     where app_id = any($1::text[])
+     group by app_id`,
+    [apps.map((app) => app.id)],
+  );
+  const byId = new Map(counts.map((row) => [row.app_id, row.member_count]));
+  return apps.map((app) => ({ ...appView(app), memberCount: byId.get(app.id) ?? 0 }));
+}
+
+export async function appSummary(ownerId: string, appId: string): Promise<AppSummary | null> {
+  const app = await one(`select id from apps where id = $1 and owner_id = $2`, [appId, ownerId]);
+  if (!app) return null;
+  const count = await one<{ n: number }>(
+    `select count(distinct user_id)::int as n from (
+       select user_id from app_grants where app_id = $1
+       union
+       select user_id from app_tokens where app_id = $1
+     ) s`,
+    [appId],
+  );
+  const last = await one<{ last_used_at: Date | null }>(
+    `select max(last_used_at) as last_used_at from app_tokens where app_id = $1`,
+    [appId],
+  );
+  return {
+    memberCount: count?.n ?? 0,
+    lastUsedAt: last?.last_used_at ? iso(last.last_used_at) : null,
+  };
 }
 
 export async function getDeveloperApp(
@@ -322,20 +379,32 @@ function memberAccounts(value: MemberRow["accounts"]): string[] {
   return list.map((account) => `${platformLabel(account.provider)} ${account.handle}`);
 }
 
+const MEMBER_ACCOUNTS_SQL = `coalesce(
+  (select json_agg(json_build_object('provider', a.provider, 'handle', a.handle)
+                   order by a.provider, a.handle)
+   from app_grants g
+   join accounts a on a.id = g.account_id
+   where g.user_id = u.id and g.app_id = $1),
+  '[]'::json
+)`;
+
+function memberView(row: MemberRow): AppMemberView {
+  return {
+    userId: row.id,
+    displayName: row.display_name,
+    email: row.email,
+    accounts: memberAccounts(row.accounts),
+    lastUsedAt: row.last_used_at ? iso(row.last_used_at) : null,
+  };
+}
+
 /** People who have signed in to this app, or who still have a grant or token for it. */
 export async function listAppMembers(ownerId: string, appId: string): Promise<AppMemberView[]> {
   const app = await one(`select id from apps where id = $1 and owner_id = $2`, [appId, ownerId]);
   if (!app) return [];
   const found = await rows<MemberRow>(
     `select u.id, u.display_name, u.email,
-            coalesce(
-              (select json_agg(json_build_object('provider', a.provider, 'handle', a.handle)
-                               order by a.provider, a.handle)
-               from app_grants g
-               join accounts a on a.id = g.account_id
-               where g.user_id = u.id and g.app_id = $1),
-              '[]'::json
-            ) as accounts,
+            ${MEMBER_ACCOUNTS_SQL} as accounts,
             (select max(t.last_used_at) from app_tokens t where t.user_id = u.id and t.app_id = $1) as last_used_at
      from users u
      where u.id in (
@@ -346,12 +415,81 @@ export async function listAppMembers(ownerId: string, appId: string): Promise<Ap
      order by lower(u.display_name)`,
     [appId],
   );
+  return found.map(memberView);
+}
+
+/** Overview only. Same account labels as listAppMembers, capped at five. */
+export async function listRecentMembers(ownerId: string, appId: string): Promise<AppMemberView[]> {
+  const app = await one(`select id from apps where id = $1 and owner_id = $2`, [appId, ownerId]);
+  if (!app) return [];
+  const found = await rows<MemberRow>(
+    `select u.id, u.display_name, u.email,
+            ${MEMBER_ACCOUNTS_SQL} as accounts,
+            (select max(t.last_used_at) from app_tokens t where t.user_id = u.id and t.app_id = $1) as last_used_at
+     from users u
+     where u.id in (
+       select user_id from app_grants where app_id = $1
+       union
+       select user_id from app_tokens where app_id = $1
+     )
+     order by last_used_at desc nulls last, lower(u.display_name)
+     limit 5`,
+    [appId],
+  );
+  return found.map(memberView);
+}
+
+/**
+ * Current grants and tokens. Null when the caller does not own the app
+ * (the route 404s). An empty array is a real snapshot with nothing in it.
+ * No row cap: this is the current set. Add one if a single app passes a few hundred rows.
+ */
+export async function listAppGrants(
+  ownerId: string,
+  appId: string,
+  client?: Queryable,
+): Promise<AppGrantView[] | null> {
+  const app = await one(
+    `select id from apps where id = $1 and owner_id = $2`,
+    [appId, ownerId],
+    client,
+  );
+  if (!app) return null;
+  const found = await rows<{
+    kind: "grant" | "token";
+    at: Date;
+    display_name: string;
+    provider: string | null;
+    handle: string | null;
+    scopes: string | null;
+    used: boolean;
+  }>(
+    `select kind, at, display_name, provider, handle, scopes, used from (
+       select 'grant'::text as kind, g.granted_at as at, u.display_name,
+              a.provider, a.handle, g.scopes, true as used
+       from app_grants g
+       join users u on u.id = g.user_id
+       join accounts a on a.id = g.account_id
+       where g.app_id = $1
+       union all
+       select 'token'::text, coalesce(t.last_used_at, t.created_at), u.display_name,
+              null::text, null::text, null::text, t.last_used_at is not null
+       from app_tokens t
+       join users u on u.id = t.user_id
+       where t.app_id = $1
+     ) e
+     order by at desc`,
+    [appId],
+    client,
+  );
   return found.map((row) => ({
-    userId: row.id,
+    kind: row.kind,
+    at: iso(row.at),
     displayName: row.display_name,
-    email: row.email,
-    accounts: memberAccounts(row.accounts),
-    lastUsedAt: row.last_used_at ? iso(row.last_used_at) : null,
+    provider: row.provider,
+    handle: row.handle,
+    scopes: row.scopes,
+    used: row.used,
   }));
 }
 
@@ -390,7 +528,11 @@ export async function removeAppMember(
     return grants.length + tokens.length + codes.length;
   });
   if (removed === 0) return { ok: false, error: "That person is not signed in to this app." };
-  await logActivity(ownerId, "Member removed", `${member.display_name} can no longer use ${app.name}`);
+  await logActivity(
+    ownerId,
+    "Member removed",
+    `${member.display_name} can no longer use ${app.name}`,
+  );
   await logActivity(memberUserId, "App access removed", app.name);
   return { ok: true };
 }

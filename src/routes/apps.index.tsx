@@ -15,6 +15,14 @@ export const Route = createFileRoute("/apps/")({
   component: Apps,
 });
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 function Apps() {
   const apps = Route.useLoaderData();
   const navigate = useNavigate();
@@ -30,6 +38,7 @@ function Apps() {
       <p className="mt-3 text-muted">
         Register a product, pick how its users can sign in, and copy the widget onto your site.
       </p>
+      <p className="mt-2 text-sm text-muted">{apps.length} of 25</p>
       <div className="mt-8 grid gap-3">
         {created ? (
           <SecretNotice
@@ -48,13 +57,20 @@ function Apps() {
             <span className="min-w-0">
               <span className="block truncate font-semibold">{app.name}</span>
               <span className="block truncate text-sm text-muted">
-                {app.methods.map((method) => method.label).join(", ") || "No sign-in methods"}
+                {[
+                  app.methods.map((method) => method.label).join(", ") || "No sign-in methods",
+                  hostOf(app.homepageUrl),
+                  new Date(app.createdAt).toLocaleString(),
+                  `${app.memberCount} ${app.memberCount === 1 ? "member" : "members"}`,
+                ].join(" · ")}
               </span>
             </span>
             <ChevronRight className="size-5 shrink-0 text-muted" aria-hidden="true" />
           </Link>
         ))}
-        {creating ? (
+        {apps.length >= 25 ? (
+          <p className="text-sm text-muted">This account already owns the maximum of 25 apps.</p>
+        ) : creating ? (
           <AppForm
             onSaved={(result) => {
               setCreating(false);

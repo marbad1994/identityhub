@@ -7,11 +7,11 @@
  *
  * Renders one Sign in button. Opening it shows the sign-in methods the app
  * chose in Identity Hub (fetched live, so changing them there needs no change
- * here) plus email sign-up. Each method opens the hub in a popup: passwords
- * are only ever typed on the hub, never on the host site.
- * When the person is done, the popup closes and this page goes to the app's
- * redirect URI with `code` and `state`, exactly like a full-page redirect.
- * With popups blocked, the widget falls back to that full-page redirect.
+ * here) plus email sign-up. The modal path opens hub credential pages in a
+ * frame: passwords are only ever typed on the hub, never on the host site.
+ * Allow and Deny run in a top-level hub window. presentation "popup" keeps
+ * the older window.open path. When the person is done, this page goes to the
+ * app's redirect URI with `code` and `state`.
  *
  * The widget stores a random `state` in the cookie `ihub_state` on the host
  * site. The app's callback must check that the `state` query parameter equals
@@ -162,6 +162,272 @@
     return "/authorize?" + params.toString();
   }
 
+  /** A relay on the top window makes /authorize close instead of redirecting to the app. */
+  function withoutRelay(path) {
+    var query = path.indexOf("?");
+    if (query === -1) return path;
+    var params = new URLSearchParams(path.slice(query + 1));
+    params.delete("relay");
+    var rest = params.toString();
+    return rest ? path.slice(0, query) + "?" + rest : path.slice(0, query);
+  }
+
+  function installStyles(root, text) {
+    if (
+      "adoptedStyleSheets" in root &&
+      typeof CSSStyleSheet !== "undefined" &&
+      "replaceSync" in CSSStyleSheet.prototype
+    ) {
+      var sheet = new CSSStyleSheet();
+      sheet.replaceSync(text);
+      root.adoptedStyleSheets = [sheet];
+      return;
+    }
+    var style = document.createElement("style");
+    style.textContent = text;
+    root.appendChild(style);
+  }
+
+  function frameUrl(options, page, method, relay, state) {
+    var next = authorizePath(options, method, relay, state);
+    var params = new URLSearchParams({
+      embed: "1",
+      parent_origin: location.origin,
+      return_to: next,
+    });
+    return options.hub + page + "?" + params.toString();
+  }
+
+  function modalCss() {
+    return [
+      ":host{all:initial}",
+      ".backdrop{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.45)}",
+      ".dialog{display:flex;flex-direction:column;width:min(560px,100%);height:min(720px,calc(100dvh - 32px));overflow:hidden;border-radius:20px;background:#fff;color:#111;font-family:Inter,Segoe UI,sans-serif}",
+      ".bar{display:flex;flex:none;align-items:center;justify-content:flex-end;height:44px}",
+      ".close{min-width:44px;min-height:44px;border:0;background:transparent;color:#111;font:inherit;font-size:14px;font-weight:600;cursor:pointer}",
+      ".body{display:flex;flex:1;flex-direction:column;min-height:0}",
+      "iframe{flex:1;width:100%;border:0}",
+      ".fallback{display:flex;flex:1;flex-direction:column;justify-content:center;gap:16px;padding:24px}",
+      ".fallback p{margin:0;font-size:16px;line-height:1.5}",
+      ".go{min-height:44px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}",
+      "@media (max-width:639px){.backdrop{padding:0}.dialog{width:100%;height:100dvh;border-radius:0}.bar{height:calc(44px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)}}",
+    ].join("");
+  }
+
+  function acceptLocation(options, location) {
+    var target = new URL(location);
+    var expected = new URL(options.redirectUri);
+    if (target.origin !== expected.origin || target.pathname !== expected.pathname) return false;
+    window.top.location.assign(location);
+    return true;
+  }
+
+  function openModal(options, frameSrc, relay, continuePath, invoker) {
+    if (window.__ihubModal) window.__ihubModal.close();
+    var host = document.createElement("div");
+    var root = host.attachShadow({ mode: "open" });
+    installStyles(root, modalCss());
+    var backdrop = document.createElement("div");
+    backdrop.className = "backdrop";
+    var dialog = document.createElement("div");
+    dialog.className = "dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-label", "Sign in with Identity Hub");
+    var bar = document.createElement("div");
+    bar.className = "bar";
+    var closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "close";
+    closeButton.textContent = "Close";
+    bar.appendChild(closeButton);
+    var body = document.createElement("div");
+    body.className = "body";
+    var iframe = document.createElement("iframe");
+    iframe.title = "Sign in with Identity Hub";
+    iframe.setAttribute(
+      "sandbox",
+      "allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation",
+    );
+    iframe.referrerPolicy = "no-referrer";
+    iframe.src = frameSrc;
+    body.appendChild(iframe);
+    dialog.appendChild(bar);
+    dialog.appendChild(body);
+    backdrop.appendChild(dialog);
+    root.appendChild(backdrop);
+
+    var stashed = [];
+    Array.prototype.forEach.call(document.body.children, function (child) {
+      if (child.hasAttribute("inert")) return;
+      child.setAttribute("inert", "");
+      stashed.push(child);
+    });
+    document.body.appendChild(host);
+    closeButton.focus();
+
+    var stopped = false;
+    var settled = false;
+    var closed = false;
+    var deadline = Date.now() + 15 * 60 * 1000;
+    var pollTimer = 0;
+    var handshake = setTimeout(function () {
+      beacon();
+      showFallback("This page blocked the sign-in frame.", true);
+    }, 8000);
+
+    function beacon() {
+      try {
+        navigator.sendBeacon(
+          options.hub + "/api/auth/embed-report",
+          new Blob([JSON.stringify({ reason: "handshake-timeout" })], { type: "text/plain" }),
+        );
+      } catch (error) {
+        // The timeout still shows the button when the beacon cannot leave.
+      }
+    }
+
+    function stopPoll() {
+      stopped = true;
+      clearTimeout(pollTimer);
+    }
+
+    function readRelay() {
+      return fetch(options.hub + "/api/v1/relay/" + encodeURIComponent(relay), {
+        credentials: "omit",
+        cache: "no-store",
+      }).then(function (response) {
+        return response.json();
+      });
+    }
+
+    function poll(delay) {
+      if (stopped) return;
+      pollTimer = setTimeout(function () {
+        if (stopped) return;
+        if (Date.now() > deadline) {
+          showFallback("Sign-in timed out.", false);
+          return;
+        }
+        readRelay()
+          .then(function (payload) {
+            if (stopped) return;
+            if (payload && payload.status === "done" && payload.location) {
+              stopPoll();
+              acceptLocation(options, payload.location);
+              return;
+            }
+            poll(1000);
+          })
+          .catch(function () {
+            poll(2000);
+          });
+      }, delay);
+    }
+
+    function showFallback(message, withButton) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(handshake);
+      while (body.firstChild) body.removeChild(body.firstChild);
+      var panel = document.createElement("div");
+      panel.className = "fallback";
+      var text = document.createElement("p");
+      text.textContent = message;
+      panel.appendChild(text);
+      if (withButton) {
+        var go = document.createElement("button");
+        go.type = "button";
+        go.className = "go";
+        go.textContent = "Continue on Identity Hub";
+        go.addEventListener("click", function () {
+          window.top.location.assign(options.hub + withoutRelay(continuePath));
+        });
+        panel.appendChild(go);
+      }
+      body.appendChild(panel);
+    }
+
+    function onMessage(event) {
+      if (event.origin !== options.hub) return;
+      if (!iframe.contentWindow || event.source !== iframe.contentWindow) return;
+      var data = event.data;
+      if (!data || data.source !== "identity-hub" || data.v !== 1) return;
+      if (data.type === "ready") {
+        clearTimeout(handshake);
+        return;
+      }
+      if (data.type === "done") {
+        readRelay()
+          .then(function (payload) {
+            if (payload && payload.status === "done" && payload.location)
+              acceptLocation(options, payload.location);
+          })
+          .catch(function () {});
+        return;
+      }
+      if (data.type === "dismiss") {
+        closeModal();
+        return;
+      }
+      if (data.type === "cookies-blocked") {
+        showFallback("This browser will not keep a sign-in in the frame.", true);
+        return;
+      }
+      if (data.type === "popup-blocked") {
+        showFallback("The sign-in window was blocked.", true);
+        return;
+      }
+      if (data.type === "reset-sent") {
+        stopPoll();
+        showFallback(
+          "The link opens in a new tab. This sign-in will not finish. After you change the password, start again from the site.",
+          false,
+        );
+      }
+    }
+
+    function closeModal() {
+      if (closed) return;
+      closed = true;
+      stopPoll();
+      clearTimeout(handshake);
+      window.removeEventListener("message", onMessage);
+      window.removeEventListener("keydown", onKey);
+      readRelay()
+        .then(function (payload) {
+          if (payload && payload.status === "done" && payload.location)
+            acceptLocation(options, payload.location);
+        })
+        .catch(function () {});
+      stashed.forEach(function (child) {
+        child.removeAttribute("inert");
+      });
+      host.remove();
+      if (window.__ihubModal && window.__ihubModal.host === host) window.__ihubModal = null;
+      if (invoker) {
+        try {
+          invoker.focus();
+        } catch (error) {
+          // The button may already be gone.
+        }
+      }
+    }
+
+    function onKey(event) {
+      if (event.key === "Escape") closeModal();
+    }
+
+    backdrop.addEventListener("pointerdown", function (event) {
+      if (event.target === backdrop) closeModal();
+    });
+    closeButton.addEventListener("click", closeModal);
+    window.addEventListener("message", onMessage);
+    window.addEventListener("keydown", onKey);
+    poll(1000);
+    window.__ihubModal = { host: host, close: closeModal };
+  }
+
   function launch(options, url, relay) {
     // Must run inside the click handler, before any await, or browsers block it.
     var popup = openPopup(url);
@@ -184,39 +450,38 @@
     });
   }
 
-  function start(options, method) {
+  function start(options, method, invoker) {
+    if (options.preview) return;
     var state = randomState();
     rememberState(state);
     var relay = randomState();
-    launch(options, options.hub + authorizePath(options, method, relay, state), relay);
+    var next = authorizePath(options, method, relay, state);
+    if (options.presentation === "popup") {
+      launch(options, options.hub + next, relay);
+      return;
+    }
+    openModal(options, frameUrl(options, "/login", method, relay, state), relay, next, invoker);
   }
 
   /** Email sign-up stays on the hub. After the address is confirmed, consent continues. */
-  function startSignup(options) {
+  function startSignup(options, invoker) {
+    if (options.preview) return;
     var state = randomState();
     rememberState(state);
     var relay = randomState();
     var next = authorizePath(options, "password", relay, state);
-    launch(options, options.hub + "/signup?return_to=" + encodeURIComponent(next), relay);
+    if (options.presentation === "popup") {
+      launch(options, options.hub + "/signup?return_to=" + encodeURIComponent(next), relay);
+      return;
+    }
+    openModal(options, frameUrl(options, "/signup", "password", relay, state), relay, next, invoker);
   }
 
   function render(root, config, options) {
     while (root.firstChild) root.removeChild(root.firstChild);
     // A constructed stylesheet is not inline CSS, so a strict CSP on the host
     // page (style-src without 'unsafe-inline') does not block it.
-    var style = null;
-    if (
-      "adoptedStyleSheets" in root &&
-      typeof CSSStyleSheet !== "undefined" &&
-      "replaceSync" in CSSStyleSheet.prototype
-    ) {
-      var sheet = new CSSStyleSheet();
-      sheet.replaceSync(css(config.theme));
-      root.adoptedStyleSheets = [sheet];
-    } else {
-      style = document.createElement("style");
-      style.textContent = css(config.theme);
-    }
+    installStyles(root, css(config.theme));
     var wrap = document.createElement("div");
     wrap.className = "wrap";
     var launcher = document.createElement("button");
@@ -244,7 +509,7 @@
       button.appendChild(document.createTextNode("Continue with " + method.label));
       button.addEventListener("click", function () {
         if (options.preview) return;
-        start(options, method.id);
+        start(options, method.id, button);
       });
       list.appendChild(button);
     });
@@ -255,7 +520,7 @@
     signup.appendChild(document.createTextNode("Sign up with email"));
     signup.addEventListener("click", function () {
       if (options.preview) return;
-      startSignup(options);
+      startSignup(options, signup);
     });
     list.appendChild(signup);
     panel.appendChild(list);
@@ -295,7 +560,6 @@
     document.addEventListener("pointerdown", root._ihubOutside);
     wrap.appendChild(launcher);
     wrap.appendChild(panel);
-    if (style) root.appendChild(style);
     root.appendChild(wrap);
   }
 
@@ -321,6 +585,7 @@
         // on the configured host, which owns the hub's session cookie.
         if (config.hub_origin) options.hub = new URL(config.hub_origin).origin;
         if (!options.redirectUri) options.redirectUri = config.redirect_uris[0];
+        options.presentation = config.presentation === "popup" ? "popup" : "modal";
         render(root, config, options);
       })
       .catch(function (error) {

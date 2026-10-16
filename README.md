@@ -8,9 +8,9 @@ Supported: X, Instagram, Facebook (one account per Page), TikTok, LinkedIn, YouT
 
 1. **Sign in** at `/login` with any configured platform, or with email and password (`/signup`, confirmed by an emailed link). The first platform sign-in creates the user and connects that account. People who started with a platform can add an email and password in `/settings`, and turn on authenticator-app two-factor there.
 2. **Connect** more accounts from `/workspace`. Connecting also lets that platform identity sign in to the same user.
-3. **Platform sign-in runs in a popup** that closes itself when done; the page then moves on. The popup reports back through a single-use relay (`/api/v1/relay/{id}`) that the page polls, so it works even when a platform's page cuts the popup's link to its opener. With popups blocked, sign-in falls back to a full-page redirect.
-4. **Choose sign-in methods and copy the widget** for each app at `/apps/{id}`: tick platforms and email/password, pick a theme, watch the live preview, copy the snippet. The widget fetches its settings from the hub, so later changes need no code change.
-5. **Authorize** an app at `/authorize`. The widget opens it in a popup and, when the person is done, sends the host page to the app's redirect URI with `code` and `state`. The person picks accounts; the app gets a one-time code, exchanges it server-side for a long-lived app token, reads the person and granted accounts, and requests platform tokens for accounts granted `publish`.
+3. **The widget opens hub credential pages in a frame.** Passwords are typed on the hub. Allow and Deny run in a top-level hub window, not in the frame. That window reports back through a single-use relay (`/api/v1/relay/{id}`) that the page polls, so it works even when a platform's page cuts the window's link to its opener. If the frame cannot be shown, the widget offers a button to continue on the hub. `WIDGET_MODAL=0` keeps the older popup for every method.
+4. **Choose sign-in methods and copy the widget** on the app's Widget tab at `/apps/{id}`: tick platforms and email/password, pick a theme, watch the live preview, copy the snippet. The widget fetches its settings from the hub, so later changes need no code change.
+5. **Authorize** an app at `/authorize`, which stays unframed. The widget's top-level window opens it and, when the person is done, sends the host page to the app's redirect URI with `code` and `state`. The person picks accounts; the app gets a one-time code, exchanges it server-side for a long-lived app token, reads the person and granted accounts, and requests platform tokens for accounts granted `publish`.
 
 ## App API
 
@@ -21,7 +21,7 @@ Full walkthrough with examples: `/docs` on a running hub (`src/routes/docs.tsx`)
 | `GET /authorize?client_id&redirect_uri&scope&state[&method]` | browser | Sign-in and consent, limited to the app's chosen methods. `scope` is `profile`, `publish` or both; `method` (a platform id or `password`) skips the method choice. Redirects back with `code` and `state`, or `error=access_denied`. |
 | `GET /widget.js` | none | The embeddable sign-in widget. See the snippet on each app's page. |
 | `GET /api/v1/relay/{id}` | none (CORS `*`) | Polled by a page while its sign-in popup is open: `pending`, then once `{"status":"done","location"}`. |
-| `GET /api/v1/widget/{client_id}` | none (CORS `*`) | The widget's live config: app name, theme, sign-in methods. |
+| `GET /api/v1/widget/{client_id}` | none (CORS `*`) | The widget's live config: app name, theme, sign-in methods, and `presentation` (`modal`, or `popup` when `WIDGET_MODAL=0`). |
 | `POST /api/v1/oauth/token` | client id and secret (body or Basic) | `grant_type=authorization_code`, `code`, `redirect_uri`. Returns `access_token`, `user` (`id`, `display_name`, `avatar_url`, `email`, which is null for platform-only people and otherwise confirmed), `accounts` (may be empty). Codes are single use, ten minutes. |
 | `GET /api/v1/me` | `Bearer ihub_at_...` | The user and the accounts granted to this app. |
 | `POST /api/v1/accounts/{id}/token` | `Bearer ihub_at_...` | Current platform access token for an account granted `publish`; refreshed first when it expires within five minutes. |
@@ -46,6 +46,7 @@ Apps are registered under Apps with exact redirect URIs. The client secret is sh
 | Email (sign-up, reset, security notices) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS` (same names as SocialPostAPI). Email and password sign-in is offered only once `SMTP_HOST` and `SMTP_FROM_EMAIL` are set. |
 | Reuse SocialPostAPI's callbacks (optional) | `PLATFORM_CALLBACK_BASE`, e.g. `https://socialpostapi.makketing.com/api/connect` |
 | Rate-limit client IPs (optional) | `TRUSTED_PROXIES`: proxies whose `X-Forwarded-For` is believed. Defaults to loopback and private ranges, which covers Caddy reaching the hub over Docker. |
+| Widget popup fallback (optional) | `WIDGET_MODAL=0` serves `presentation: "popup"` so the widget keeps today's `window.open` path. |
 
 The platform variable names match SocialPostAPI's, so the same developer apps serve both. A platform appears on the sign-in page once both of its values are set.
 
@@ -73,9 +74,9 @@ Email and password accounts follow NIST SP 800-63B-4 and the OWASP authenticatio
 - **Two-factor**: RFC 6238 TOTP (authenticator apps) with replay protection and ten single-use recovery codes, all stored encrypted or hashed. Sensitive changes (turning two-factor off, new recovery codes, deleting the account) require the current password.
 - **Email links**: 32 random bytes, stored as SHA-256, single use; sign-up links expire in 24 hours, reset links in 30 minutes. A reset ends every session; a password change ends every other session; both, and two-factor changes, email the owner.
 - **Sessions**: a new random token per sign-in, stored hashed, in a `__Host-` cookie (HttpOnly, Secure, SameSite=Lax) on https; 7-day idle and 30-day absolute timeouts; "sign out everywhere else" in settings.
-- **Browser**: per-request nonce Content-Security-Policy with `strict-dynamic`, `frame-ancestors 'none'`, HSTS on https, `nosniff`, a strict referrer policy, COOP, CORP and `no-store` on pages. Server functions and the sign-out form are CSRF-checked (Sec-Fetch-Site, then Origin). Fonts are self-hosted.
+- **Browser**: per-request nonce Content-Security-Policy with `strict-dynamic`, HSTS on https, `nosniff`, a strict referrer policy, COOP, CORP and `no-store` on pages. Account and developer pages, `/authorize`, and `/reset-password` send `frame-ancestors 'none'`. `embed=1` on login, signup, and forgot-password may be framed by a registered homepage or redirect origin. Server functions and the sign-out form are CSRF-checked (Sec-Fetch-Site, then Origin). Fonts are self-hosted.
 - **Popups and relay**: relay ids are 32 random bytes made by the opening page, stored only as hashes, single read, 15-minute lifetime. The widget only follows a result that points at its own redirect URI.
-- **Widget**: passwords are never typed on the host site; every widget button opens the hub (in a popup). The widget sets a random `state` in the `ihub_state` cookie on the host site, which the app's callback must compare with the returned `state`.
+- **Widget**: passwords are never typed on the host site. The widget opens hub credential pages in a frame; Allow and Deny stay in a top-level hub window. Integrators allow the hub origin in `script-src`, `connect-src` (widget config and relay poll), and `frame-src`. `style-src 'unsafe-inline'` is still unnecessary. The widget sets a random `state` in the `ihub_state` cookie on the host site, which the app's callback must compare with the returned `state`. `WIDGET_MODAL=0` forces the popup path.
 
 ## Deploy (Docker)
 

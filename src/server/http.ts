@@ -1,9 +1,16 @@
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { ApiError } from "./apps";
 
-export function redirect(location: string, setCookie?: string): Response {
+function appendCookies(headers: Headers, setCookie?: string | string[]): void {
+  if (!setCookie) return;
+  for (const cookie of Array.isArray(setCookie) ? setCookie : [setCookie]) {
+    headers.append("set-cookie", cookie);
+  }
+}
+
+export function redirect(location: string, setCookie?: string | string[]): Response {
   const headers = new Headers({ location, "cache-control": "no-store" });
-  if (setCookie) headers.append("set-cookie", setCookie);
+  appendCookies(headers, setCookie);
   return new Response(null, { status: 302, headers });
 }
 
@@ -32,7 +39,7 @@ export async function apiResponse(work: () => Promise<unknown>): Promise<Respons
  * the popup's link to its opener; if the browser refuses to close a window
  * the hub did not open itself, the message stays.
  */
-export function popupDone(message: string, setCookie?: string): Response {
+export function popupDone(message: string, setCookie?: string | string[]): Response {
   const nonce = (getGlobalStartContext() as { nonce?: string } | undefined)?.nonce ?? "";
   const escaped = message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Identity Hub</title>
@@ -43,6 +50,6 @@ export function popupDone(message: string, setCookie?: string): Response {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
   });
-  if (setCookie) headers.append("set-cookie", setCookie);
+  appendCookies(headers, setCookie);
   return new Response(html, { status: 200, headers });
 }

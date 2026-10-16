@@ -99,7 +99,30 @@ export function SiteFooter() {
   );
 }
 
-export function Page({ children, width = "max-w-5xl" }: { children: ReactNode; width?: string }) {
+export function Page({
+  children,
+  width = "max-w-5xl",
+  embed = false,
+}: {
+  children: ReactNode;
+  width?: string;
+  embed?: boolean;
+}) {
+  if (embed) {
+    return (
+      <>
+        <header className="border-b border-line">
+          <div className="mx-auto flex min-h-16 max-w-none items-center gap-2.5 px-4 text-fg">
+            <Mark className="size-7" />
+            <span className="text-base font-bold tracking-tight">
+              Identity<span className="font-semibold text-muted"> Hub</span>
+            </span>
+          </div>
+        </header>
+        <main className="mx-auto max-w-none px-4 py-8">{children}</main>
+      </>
+    );
+  }
   return (
     <>
       <SiteHeader />
