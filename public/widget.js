@@ -38,6 +38,10 @@
   };
   // Lucide "ghost" and "mail", stroked.
   var STROKED = {
+    shield: "m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3zM8 12l3 3 5-6",
+    lock: "M5 10h14v11H5zM8 10V7a4 4 0 0 1 8 0v3M12 14v3",
+    fingerprint:
+      "M4 12a8 8 0 0 1 16 0M7 12a5 5 0 0 1 10 0c0 4-.5 7-2 9M10 20c2-3 2-5 2-8M7 15c0 3-1 5-2 6M20 15c0 2-.3 4-.8 6",
     snapchat:
       "M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z",
     password:
@@ -64,48 +68,40 @@
     return svg;
   }
 
-  function css(theme) {
+  function css(theme, accent) {
     var dark = theme === "dark";
-    var c = dark
-      ? {
-          bg: "#161618",
-          fg: "#f5f5f7",
-          muted: "#a1a1a6",
-          line: "rgba(255,255,255,.14)",
-          hover: "rgba(255,255,255,.07)",
-        }
-      : { bg: "#ffffff", fg: "#111111", muted: "#6e6e73", line: "#e8e8ed", hover: "#f5f5f7" };
-    var ink = dark ? "#f5f5f7" : "#111111";
-    var onInk = dark ? "#111111" : "#ffffff";
-    return [
-      ":host{all:initial;display:block;font-family:'Inter Variable',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}",
-      ".wrap{display:inline-block;max-width:380px;vertical-align:top}",
-      ".launcher{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;background:" +
-        ink +
-        ";color:" +
-        onInk +
-        ";font-size:15px;font-weight:600;cursor:pointer}",
-      ".launcher:focus-visible,.method:focus-visible{outline:3px solid #0071e3;outline-offset:2px}",
-      ".panel{box-sizing:border-box;margin-top:8px;background:" +
-        c.bg +
-        ";color:" +
-        c.fg +
-        ";border:1px solid " +
-        c.line +
-        ";border-radius:20px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.06)}",
-      ".panel[hidden]{display:none}",
-      ".title{margin:0;font-size:16px;line-height:1.3;font-weight:650;letter-spacing:-.02em}",
-      ".methods{display:grid;gap:8px;margin-top:14px}",
-      ".method{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;min-height:44px;padding:0 16px;border:1px solid " +
-        c.line +
-        ";border-radius:999px;font-size:15px;font-weight:600;color:" +
-        c.fg +
-        ";cursor:pointer}",
-      ".method:hover{background:" + c.hover + "}",
-      "svg{width:20px;height:20px;flex:none}",
-      ".foot{margin:16px 0 0;font-size:12px;color:" + c.muted + "}",
-      ".note{margin:12px 0 0;font-size:13px;color:" + c.muted + "}",
-    ].join("");
+    var palette = {
+      sage: dark ? ["#b9d6b9", "#2a3f30", "#16281c"] : ["#315d4c", "#e9f2e9", "#fff"],
+      blue: dark ? ["#a9cfe9", "#223d50", "#142735"] : ["#285b87", "#e9f1f8", "#fff"],
+      violet: dark ? ["#d0bfeb", "#392e4c", "#292037"] : ["#66508d", "#f0ecf7", "#fff"],
+    };
+    var chosen = Object.prototype.hasOwnProperty.call(palette, accent)
+      ? palette[accent]
+      : palette.sage;
+    return `
+      :host{all:initial;display:block;font-family:'Inter Variable',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        --bg:${dark ? "#1a2520" : "#fff"};--fg:${dark ? "#f0f4ef" : "#1a2925"};--muted:${dark ? "#b0bdb4" : "#5c6b63"};
+        --line:${dark ? "#34453b" : "#e1e7e2"};--control:${dark ? "#718779" : "#a4afa8"};--soft:${dark ? "#233129" : "#f3f6f3"};
+        --accent:${chosen[0]};--accent-soft:${chosen[1]};--on-accent:${chosen[2]};color-scheme:${dark ? "dark" : "light"}}
+      *,*::before,*::after{box-sizing:border-box} [hidden]{display:none!important}
+      .wrap{display:block;max-width:404px;width:100%;font-size:14px;line-height:1.5;color:var(--fg)}
+      button{font:inherit;cursor:pointer} button:disabled{cursor:wait;opacity:.55}
+      .launcher{display:inline-flex;align-items:center;gap:9px;min-height:46px;padding:0 20px;border:1px solid var(--fg);border-radius:9px;background:var(--fg);color:var(--bg);font-size:14px;font-weight:600}
+      button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+      .panel{margin-top:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 24px 64px -24px #203b3433,0 4px 16px #203b3408}
+      .topline{display:flex;align-items:center;gap:7px;padding:20px 26px 0;font-size:11px;color:var(--muted)}.topline svg{width:14px;height:14px}
+      .content{padding:26px}.monogram{width:52px;height:52px;display:grid;place-items:center;margin:0 auto 22px;border-radius:14px;border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);font-size:30px;font-weight:650;letter-spacing:-1.5px}
+      .title{margin:0;text-align:center;font-size:25px;line-height:1.25;font-weight:600;letter-spacing:-.8px;overflow-wrap:anywhere}.subtitle{margin:11px 0 24px;text-align:center;font-size:13px;line-height:1.7;color:var(--muted)}
+      .methods{display:grid;gap:10px}.method{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:48px;padding:11px 15px;border:1px solid var(--control);border-radius:9px;font-size:14px;font-weight:600;color:var(--fg);background:var(--bg);transition:background .18s,border-color .18s}
+      .method:hover{background:var(--soft);border-color:var(--accent)}.method.primary{background:var(--fg);border-color:var(--fg);color:var(--bg)}.method.primary:hover{opacity:.9}
+      svg{width:19px;height:19px;flex:none}.divider{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:11px;color:var(--muted)}.divider::before,.divider::after{content:"";height:1px;background:var(--line);flex:1}
+      .signup{margin:14px 0 0;text-align:center;font-size:13px;color:var(--muted)}.text-button{border:0;background:transparent;color:var(--accent);min-height:44px;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+      .privacy{display:flex;align-items:flex-start;gap:10px;padding:14px;margin-top:22px;border-radius:9px;background:var(--soft)}.privacy svg{width:17px;height:17px;color:var(--accent);margin-top:2px}.privacy p{margin:0;color:var(--muted);font-size:11px;line-height:1.7}.privacy strong{display:block;color:var(--fg);font-size:12px;font-weight:600}
+      .foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:0;padding:15px 18px;border-top:1px solid var(--line);background:var(--soft);color:var(--muted);font-size:10px}.foot svg{width:14px;height:14px}.foot span{white-space:nowrap}.foot strong{color:var(--fg);font-weight:650}
+      .note{font-size:12px;color:var(--muted);line-height:1.7;margin:14px 0 0}.status{border:1px solid var(--line);padding:12px;border-radius:9px;background:var(--soft);margin-top:14px}.status .note{margin:0}.status button{display:block;margin-top:6px}
+      @media(max-width:380px){.content{padding:23px}.title{font-size:23px}}
+      @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+    `;
   }
 
   function randomState() {
@@ -121,27 +117,57 @@
     var height = 720;
     var left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
     var top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
-    return window.open(url, "identity-hub-signin", "popup,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top);
+    return window.open(
+      url,
+      "identity-hub-signin",
+      "popup,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top,
+    );
   }
 
   /** Poll the hub until the popup finishes; the hub keeps the result under the relay id. */
   function waitForRelay(options, relay, popup, onDone) {
     var deadline = Date.now() + 15 * 60 * 1000;
+    var stopped = false;
+    var timer = 0;
+    var closedAt = 0;
+    var notified = false;
     function poll() {
-      if (Date.now() > deadline) return;
+      if (stopped) return;
+      if (Date.now() > deadline) {
+        options.onStatus("Sign-in timed out. You can try again.", true);
+        stopped = true;
+        return;
+      }
+      if (popup.closed && !closedAt) closedAt = Date.now();
+      // COOP can make an active provider window appear closed. Keep polling,
+      // but let the visitor restart rather than leave a frozen sign-in card.
+      if (closedAt && Date.now() - closedAt > 5000 && !notified) {
+        notified = true;
+        options.onStatus(
+          "The sign-in window has not returned. You can try again or choose another method.",
+          true,
+        );
+      }
       fetch(options.hub + "/api/v1/relay/" + relay, { credentials: "omit", cache: "no-store" })
         .then(function (response) {
           return response.json();
         })
         .then(function (body) {
-          if (body.status === "done" && body.location) onDone(body.location);
-          else setTimeout(poll, 1000);
+          if (stopped) return;
+          if (body.status === "done" && body.location) {
+            stopped = true;
+            onDone(body.location);
+          } else timer = setTimeout(poll, 1000);
         })
         .catch(function () {
-          setTimeout(poll, 2000);
+          if (!stopped) timer = setTimeout(poll, 2000);
         });
     }
     poll();
+    return function () {
+      stopped = true;
+      clearTimeout(timer);
+    };
   }
 
   function rememberState(state) {
@@ -202,14 +228,14 @@
     return [
       ":host{all:initial}",
       ".backdrop{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.45)}",
-      ".dialog{display:flex;flex-direction:column;width:min(560px,100%);height:min(720px,calc(100dvh - 32px));overflow:hidden;border-radius:20px;background:#fff;color:#111;font-family:Inter,Segoe UI,sans-serif}",
+      ".dialog{display:flex;flex-direction:column;width:min(432px,100%);height:min(780px,calc(100dvh - 32px));overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--bg);color:var(--fg);font-family:Inter,Segoe UI,sans-serif;box-shadow:0 24px 80px #0003}",
       ".bar{display:flex;flex:none;align-items:center;justify-content:flex-end;height:44px}",
-      ".close{min-width:44px;min-height:44px;border:0;background:transparent;color:#111;font:inherit;font-size:14px;font-weight:600;cursor:pointer}",
+      ".close{min-width:64px;min-height:44px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer}",
       ".body{display:flex;flex:1;flex-direction:column;min-height:0}",
       "iframe{flex:1;width:100%;border:0}",
       ".fallback{display:flex;flex:1;flex-direction:column;justify-content:center;gap:16px;padding:24px}",
       ".fallback p{margin:0;font-size:16px;line-height:1.5}",
-      ".go{min-height:44px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}",
+      ".go{min-height:48px;border:0;border-radius:9px;background:var(--accent);color:var(--on-accent);font:inherit;font-size:14px;font-weight:600;cursor:pointer}",
       "@media (max-width:639px){.backdrop{padding:0}.dialog{width:100%;height:100dvh;border-radius:0}.bar{height:calc(44px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)}}",
     ].join("");
   }
@@ -226,7 +252,7 @@
     if (window.__ihubModal) window.__ihubModal.close();
     var host = document.createElement("div");
     var root = host.attachShadow({ mode: "open" });
-    installStyles(root, modalCss());
+    installStyles(root, css(options.theme, options.accent) + modalCss());
     var backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     var dialog = document.createElement("div");
@@ -429,18 +455,39 @@
   }
 
   function launch(options, url, relay) {
+    if (options.cancel) options.cancel();
     // Must run inside the click handler, before any await, or browsers block it.
     var popup = openPopup(url);
     if (!popup) {
-      window.top.location.assign(url);
+      var fallback = new URL(url);
+      fallback.searchParams.delete("relay");
+      if (fallback.searchParams.has("return_to"))
+        fallback.searchParams.set(
+          "return_to",
+          withoutRelay(fallback.searchParams.get("return_to")),
+        );
+      window.top.location.assign(fallback.href);
       return;
     }
     if (!relay) return;
-    waitForRelay(options, relay, popup, function (location) {
+    options.onStatus(
+      "Finish signing in in the popup window. This page will update automatically.",
+      false,
+    );
+    var stop = waitForRelay(options, relay, popup, function (location) {
       // Only ever follow a result that goes to this app's own redirect URI.
-      var target = new URL(location);
+      var target;
+      try {
+        target = new URL(location);
+      } catch {
+        options.onStatus("The sign-in result was not valid. Please try again.", true);
+        return;
+      }
       var expected = new URL(options.redirectUri);
-      if (target.origin !== expected.origin || target.pathname !== expected.pathname) return;
+      if (target.origin !== expected.origin || target.pathname !== expected.pathname) {
+        options.onStatus("The sign-in result did not match this app. Please try again.", true);
+        return;
+      }
       try {
         popup.close();
       } catch {
@@ -448,6 +495,15 @@
       }
       window.top.location.assign(location);
     });
+    options.cancel = function () {
+      stop();
+      try {
+        popup.close();
+      } catch {
+        /* Already closed. */
+      }
+      options.onStatus("", false);
+    };
   }
 
   function start(options, method, invoker) {
@@ -474,14 +530,23 @@
       launch(options, options.hub + "/signup?return_to=" + encodeURIComponent(next), relay);
       return;
     }
-    openModal(options, frameUrl(options, "/signup", "password", relay, state), relay, next, invoker);
+    openModal(
+      options,
+      frameUrl(options, "/signup", "password", relay, state),
+      relay,
+      next,
+      invoker,
+    );
   }
 
   function render(root, config, options) {
+    if (root._ihubCancel) root._ihubCancel();
+    options.theme = config.theme;
+    options.accent = config.accent;
     while (root.firstChild) root.removeChild(root.firstChild);
     // A constructed stylesheet is not inline CSS, so a strict CSP on the host
     // page (style-src without 'unsafe-inline') does not block it.
-    installStyles(root, css(config.theme));
+    installStyles(root, css(config.theme, config.accent));
     var wrap = document.createElement("div");
     wrap.className = "wrap";
     var launcher = document.createElement("button");
@@ -495,13 +560,38 @@
     panel.hidden = true;
     panel.id = "ihub-methods-" + randomState().slice(0, 8);
     launcher.setAttribute("aria-controls", panel.id);
-    var title = document.createElement("p");
+    var title = document.createElement("h2");
     title.className = "title";
-    title.textContent = "Sign in to " + config.name;
-    panel.appendChild(title);
+    title.id = panel.id + "-title";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", title.id);
+    title.textContent = "Welcome to " + config.name;
+    var top = document.createElement("div");
+    top.className = "topline";
+    top.appendChild(icon("lock"));
+    top.appendChild(document.createTextNode("Sign in with IdentityHub"));
+    panel.appendChild(top);
+    var content = document.createElement("div");
+    content.className = "content";
+    var monogram = document.createElement("div");
+    monogram.className = "monogram";
+    monogram.setAttribute("aria-hidden", "true");
+    monogram.textContent = (Array.from(config.name.trim())[0] || "a").toLowerCase() + ".";
+    content.appendChild(monogram);
+    content.appendChild(title);
+    var subtitle = document.createElement("p");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "Sign in your way. We'll take it from here.";
+    content.appendChild(subtitle);
     var list = document.createElement("div");
     list.className = "methods";
-    config.methods.forEach(function (method) {
+    var social = config.methods.filter(function (method) {
+      return method.id !== "password";
+    });
+    var email = config.methods.some(function (method) {
+      return method.id === "password";
+    });
+    social.forEach(function (method) {
       var button = document.createElement("button");
       button.type = "button";
       button.className = "method";
@@ -513,26 +603,92 @@
       });
       list.appendChild(button);
     });
-    var signup = document.createElement("button");
-    signup.type = "button";
-    signup.className = "method";
-    signup.appendChild(icon("password"));
-    signup.appendChild(document.createTextNode("Sign up with email"));
-    signup.addEventListener("click", function () {
-      if (options.preview) return;
-      startSignup(options, signup);
-    });
-    list.appendChild(signup);
-    panel.appendChild(list);
+    content.appendChild(list);
+    if (email) {
+      if (social.length) {
+        var divider = document.createElement("div");
+        divider.className = "divider";
+        divider.textContent = "or use email";
+        content.appendChild(divider);
+      }
+      var emailButton = document.createElement("button");
+      emailButton.type = "button";
+      emailButton.className = "method primary";
+      emailButton.appendChild(icon("password"));
+      emailButton.appendChild(document.createTextNode("Continue with email"));
+      emailButton.addEventListener("click", function () {
+        start(options, "password", emailButton);
+      });
+      content.appendChild(emailButton);
+      var signupLine = document.createElement("p");
+      signupLine.className = "signup";
+      signupLine.appendChild(document.createTextNode("New here? "));
+      var signup = document.createElement("button");
+      signup.type = "button";
+      signup.className = "text-button";
+      signup.textContent = "Create an account";
+      signup.addEventListener("click", function () {
+        startSignup(options, signup);
+      });
+      signupLine.appendChild(signup);
+      content.appendChild(signupLine);
+    }
     if (config.methods.length === 0) {
       var none = document.createElement("p");
       none.className = "note";
       none.textContent = "No sign-in method is turned on.";
-      panel.appendChild(none);
+      content.appendChild(none);
     }
-    var foot = document.createElement("p");
+    var status = document.createElement("div");
+    status.className = "status";
+    status.hidden = true;
+    status.setAttribute("role", "status");
+    var statusText = document.createElement("p");
+    statusText.className = "note";
+    status.appendChild(statusText);
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "text-button";
+    cancel.textContent = "Cancel sign-in";
+    cancel.addEventListener("click", function () {
+      if (options.cancel) options.cancel();
+    });
+    status.appendChild(cancel);
+    options.onStatus = function (message, retry) {
+      status.hidden = !message;
+      statusText.textContent = message;
+      cancel.textContent = retry ? "Dismiss and choose a method" : "Cancel sign-in";
+    };
+    root._ihubCancel = function () {
+      if (options.cancel) options.cancel();
+    };
+    content.appendChild(status);
+    var privacy = document.createElement("div");
+    privacy.className = "privacy";
+    privacy.appendChild(icon("shield"));
+    var privacyText = document.createElement("p");
+    var privacyTitle = document.createElement("strong");
+    privacyTitle.textContent = "Your identity. Your choice.";
+    privacyText.appendChild(privacyTitle);
+    privacyText.appendChild(
+      document.createTextNode("Review what you share before an app gets access."),
+    );
+    privacy.appendChild(privacyText);
+    content.appendChild(privacy);
+    panel.appendChild(content);
+    var foot = document.createElement("div");
     foot.className = "foot";
-    foot.textContent = "Secured by Identity Hub";
+    foot.appendChild(icon("fingerprint"));
+    var brand = document.createElement("span");
+    brand.textContent = "Powered by IdentityHub";
+    foot.appendChild(brand);
+    var separator = document.createElement("span");
+    separator.textContent = "·";
+    separator.setAttribute("aria-hidden", "true");
+    foot.appendChild(separator);
+    var trust = document.createElement("span");
+    trust.textContent = "You choose what you share";
+    foot.appendChild(trust);
     panel.appendChild(foot);
     // The builder preview starts open so the chosen methods and email sign-up
     // are visible. Embedded widgets stay closed until Sign in is clicked.
@@ -590,6 +746,11 @@
       })
       .catch(function (error) {
         console.error(error);
+        var message = document.createElement("p");
+        message.setAttribute("role", "alert");
+        message.textContent =
+          "Sign-in is temporarily unavailable. Please reload this page to try again.";
+        root.appendChild(message);
       });
   }
 

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-accent="sage">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>IdentityHub · Widget playground</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/widget-demo.css" />
+    <script src="/widget-demo.js" defer></script>
+  </head>
+  <body>
+    <div id="playground">
+      <header class="site-header">
+        <a class="wordmark" href="/widget-demo.html" aria-label="IdentityHub playground home">
+          <img src="/favicon.svg" alt="" width="34" height="34" />
+          <span>Identity<span class="wordmark-light">Hub</span></span>
+        </a>
+        <span class="header-divider" aria-hidden="true"></span>
+        <span class="header-label">Widget playground</span>
+        <span class="demo-badge"><span></span> Interactive demo</span>
+      </header>
+
+      <main class="page">
+        <div class="intro">
+          <div>
+            <p class="eyebrow">A GOOD FIRST IMPRESSION</p>
+            <h1>Confidence starts at sign-in.</h1>
+            <p class="intro-copy">
+              A familiar welcome. Clear choices. Your identity, on your terms.
+            </p>
+          </div>
+          <button class="quiet-button" id="restart" type="button">
+            <span data-icon="restart"></span> Restart demo
+          </button>
+        </div>
+
+        <div class="workbench">
+          <section class="preview-pane" aria-label="Interactive widget preview">
+            <div class="preview-toolbar">
+              <span class="section-label"><span class="status-dot"></span> LIVE PREVIEW</span>
+              <div class="segmented" aria-label="Preview width">
+                <button
+                  type="button"
+                  data-device="desktop"
+                  aria-pressed="true"
+                  aria-label="Desktop preview"
+                >
+                  <span data-icon="desktop"></span>
+                </button>
+                <button
+                  type="button"
+                  data-device="mobile"
+                  aria-pressed="false"
+                  aria-label="Mobile preview"
+                >
+                  <span data-icon="phone"></span>
+                </button>
+              </div>
+            </div>
+            <div class="preview-canvas" id="preview-canvas">
+              <div class="sample-site" aria-hidden="true">
+                <div class="sample-nav">
+                  <span class="sample-mark">m.</span><span>makketing studio</span
+                  ><span class="sample-nav-line"></span>
+                </div>
+                <div class="sample-content">
+                  <div class="sample-pill"></div>
+                  <h2>Good things<br />start with you.</h2>
+                  <div class="sample-line"></div>
+                  <div class="sample-line short"></div>
+                  <div class="sample-tiles">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="widget-wrap" id="widget-wrap">
+                <article class="auth-card" id="auth-card" aria-label="Sign-in demo"></article>
+                <p class="preview-caption">
+                  <span data-icon="cursor"></span> This is interactive. Pick a sign-in method to try
+                  it.
+                </p>
+              </div>
+            </div>
+            <div class="preview-bottom">
+              <span><span data-icon="globe"></span> identityhub.makketing.com</span
+              ><span>Design &amp; interaction preview</span>
+            </div>
+          </section>
+
+          <aside class="control-pane" aria-label="Demo controls">
+            <div class="control-heading">
+              <span class="small-icon" data-icon="sliders"></span>
+              <h2>Make it yours</h2>
+            </div>
+            <p class="control-copy">See how the widget feels in your app.</p>
+            <label class="field-label" for="app-name">Application name</label>
+            <input
+              id="app-name"
+              class="control-input"
+              value="Makketing"
+              maxlength="28"
+              autocomplete="off"
+            />
+
+            <fieldset class="control-fieldset">
+              <legend class="field-label">Appearance</legend>
+              <div class="theme-choices">
+                <button type="button" data-theme-choice="light" aria-pressed="true">
+                  <span data-icon="sun"></span> Light
+                </button>
+                <button type="button" data-theme-choice="dark" aria-pressed="false">
+                  <span data-icon="moon"></span> Dark
+                </button>
+              </div>
+            </fieldset>
+
+            <fieldset class="control-fieldset">
+              <legend class="field-label">Accent color</legend>
+              <div class="swatch-row">
+                <button
+                  class="swatch sage"
+                  type="button"
+                  data-accent-choice="sage"
+                  aria-pressed="true"
+                  aria-label="Sage accent"
+                >
+                  <span data-icon="check"></span>
+                </button>
+                <button
+                  class="swatch blue"
+                  type="button"
+                  data-accent-choice="blue"
+                  aria-pressed="false"
+                  aria-label="Ocean accent"
+                >
+                  <span data-icon="check"></span>
+                </button>
+                <button
+                  class="swatch violet"
+                  type="button"
+                  data-accent-choice="violet"
+                  aria-pressed="false"
+                  aria-label="Iris accent"
+                >
+                  <span data-icon="check"></span>
+                </button>
+                <span id="accent-label">Sage</span>
+              </div>
+            </fieldset>
+
+            <div class="control-rule"></div>
+            <label class="field-label" for="scenario">Try a scenario</label>
+            <select id="scenario" class="control-input">
+              <option value="success">Successful sign-in</option>
+              <option value="closed">Popup closed early</option>
+              <option value="error">Connection interrupted</option>
+            </select>
+            <p class="field-hint">
+              Social methods open a demo popup that closes after you continue.
+            </p>
+
+            <div class="flow-guide">
+              <p class="field-label">THE EXPERIENCE</p>
+              <ol id="flow-steps">
+                <li data-step="1" class="current">
+                  <span>1</span>
+                  <div>Choose a method<small>A familiar way to sign in</small></div>
+                </li>
+                <li data-step="2">
+                  <span>2</span>
+                  <div>Review access<small>Only share what you choose</small></div>
+                </li>
+                <li data-step="3">
+                  <span>3</span>
+                  <div>You're in<small>Return to your application</small></div>
+                </li>
+              </ol>
+            </div>
+            <div class="demo-note">
+              <span data-icon="info"></span>
+              <p>
+                <strong>A safe place to explore.</strong> All accounts and sign-ins here are
+                simulated. No real passwords, emails, or platform connections.
+              </p>
+            </div>
+          </aside>
+        </div>
+
+        <div class="principles">
+          <div>
+            <span data-icon="fingerprint"></span>
+            <p>
+              <strong>Familiar by design</strong
+              ><span>Recognizable methods. One clear next step.</span>
+            </p>
+          </div>
+          <div>
+            <span data-icon="sliders"></span>
+            <p>
+              <strong>Permission, not assumption</strong
+              ><span>See what an app requests before you agree.</span>
+            </p>
+          </div>
+          <div>
+            <span data-icon="arrow-right"></span>
+            <p>
+              <strong>A smooth return</strong><span>Finish sign-in and get back to your app.</span>
+            </p>
+          </div>
+        </div>
+        <footer class="page-footer">
+          <span>IdentityHub <span class="footer-dot">/</span> Sign in with confidence.</span
+          ><span>Prototype · No live authentication</span>
+        </footer>
+      </main>
+      <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+    </div>
+    <main id="provider-demo" hidden></main>
+  </body>
+</html>

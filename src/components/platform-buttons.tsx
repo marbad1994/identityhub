@@ -15,12 +15,14 @@ export function PlatformButtons({
   returnTo,
   verb,
   popup = true,
+  appearance = "default",
 }: {
   platforms: { id: string; label: string }[];
   intent: "login" | "connect";
   returnTo: string;
   verb: string;
   popup?: boolean;
+  appearance?: "default" | "auth";
 }) {
   const [waiting, setWaiting] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
@@ -73,14 +75,14 @@ export function PlatformButtons({
 
   return (
     <div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className={appearance === "auth" ? "ih-methods" : "grid gap-2 sm:grid-cols-2"}>
         {platforms.map((platform) => (
           <a
             key={platform.id}
             href={href(platform.id)}
             onClick={(event) => start(event, platform.id, platform.label)}
             aria-disabled={waiting !== null && !canRetry}
-            className={`inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt ${waiting && !canRetry ? "pointer-events-none opacity-50" : ""}`}
+            className={`${appearance === "auth" ? "ih-method" : "inline-flex min-h-11 items-center gap-3 rounded-full border border-line bg-bg px-4 text-sm font-semibold text-fg no-underline hover:bg-bg-alt"} ${waiting && !canRetry ? "pointer-events-none opacity-50" : ""}`}
           >
             <PlatformIcon id={platform.id} className="size-5" />
             {verb} {platform.label}
@@ -91,7 +93,11 @@ export function PlatformButtons({
       {waiting ? (
         <div
           role="status"
-          className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-bg-alt px-4 py-3 text-sm"
+          className={
+            appearance === "auth"
+              ? "ih-waiting"
+              : "mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-bg-alt px-4 py-3 text-sm"
+          }
         >
           <span>Finish signing in with {waiting} in the popup window.</span>
           <button

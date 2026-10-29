@@ -4,10 +4,13 @@ import { approveConsent, denyConsent, fetchConsent } from "@/lib/api";
 import { platformLabel, SCOPES } from "@/lib/platforms";
 import { authorizePath, authorizeSearch, type AuthorizeSearch } from "@/lib/authorize-search";
 import { PlatformIcon } from "@/components/marks";
-import { ErrorNote, Page } from "@/components/shell";
+import { CheckCircle2, ShieldCheck, UserRound } from "lucide-react";
+import { AuthSurface } from "@/components/auth-surface";
+import { ErrorNote } from "@/components/shell";
 import { useSession } from "@/lib/session";
 import { PlatformButtons } from "@/components/platform-buttons";
-import { Divider, PasswordLogin } from "@/components/auth-forms";
+import { SignInChoices } from "@/components/auth-forms";
+import { useHydrated } from "@/lib/use-hydrated";
 
 type Search = AuthorizeSearch;
 
@@ -63,25 +66,23 @@ function Authorize() {
     const previous = grantable.filter((account) => account.granted);
     return (previous.length > 0 ? previous : grantable).map((account) => account.id);
   });
-  const [showAll, setShowAll] = useState(search.method !== "password");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ready = useHydrated();
 
   if (!consent.ok) {
     return (
-      <Page width="max-w-lg">
-        <h1 className="text-3xl font-semibold tracking-tight">This sign-in link is not valid</h1>
+      <AuthSurface title="This sign-in link is not valid">
         <ErrorNote message={consent.error} />
         <p className="mt-4 text-muted">
           Go back to the app and try again. If it keeps happening, contact the app's developer.
         </p>
-      </Page>
+      </AuthSurface>
     );
   }
 
   const methods = consent.app.methods;
   const platforms = methods.filter((method) => method.id !== "password");
-  const password = methods.some((method) => method.id === "password");
 
   const finish = async (
     work: () => Promise<
@@ -110,58 +111,56 @@ function Authorize() {
 
   if (done) {
     return (
-      <Page width="max-w-lg">
-        <h1 className="text-3xl font-semibold tracking-tight">All done</h1>
+      <AuthSurface
+        title="All done"
+        appName={consent.app.name}
+        appearance={consent.app.appearance}
+        description="Your choice has been saved."
+      >
+        <CheckCircle2 className="ih-success" aria-hidden="true" />
         <p className="mt-3 text-muted">
           You can close this window and return to {consent.app.name}.
         </p>
-      </Page>
+      </AuthSurface>
     );
   }
 
   return (
-    <Page width="max-w-lg">
-      <p className="text-sm font-semibold text-muted">Identity Hub</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Sign in to {consent.app.name}</h1>
-      <p className="mt-2 text-sm text-muted">{consent.app.homepageUrl}</p>
-
+    <AuthSurface
+      appName={consent.app.name}
+      appearance={consent.app.appearance}
+      title={`Sign in to ${consent.app.name}`}
+      description={
+        view
+          ? "You're in control. Review what this app may access."
+          : "Sign in your way. We'll take it from here."
+      }
+    >
       {!view ? (
-        <div className="mt-8">
-          {showAll && platforms.length > 0 ? (
-            <PlatformButtons
-              platforms={platforms}
-              intent="login"
-              returnTo={here}
-              verb="Continue with"
-              popup={!inPopup}
-            />
-          ) : null}
-          {password ? (
-            <>
-              {showAll && platforms.length > 0 ? <Divider label="or with email" /> : null}
-              <PasswordLogin returnTo={here} />
-            </>
-          ) : null}
-          {!showAll ? (
-            <button
-              type="button"
-              className="mt-4 min-h-11 text-sm font-medium text-link"
-              onClick={() => setShowAll(true)}
-            >
-              Other ways to sign in
-            </button>
-          ) : null}
-          {methods.length === 0 ? (
-            <p className="text-muted">{consent.app.name} has no sign-in method turned on.</p>
-          ) : null}
-        </div>
+        <SignInChoices
+          methods={methods}
+          returnTo={here}
+          popup={!inPopup}
+          emailFirst={search.method === "password"}
+        />
       ) : (
         <>
-          <p className="mt-6 text-sm text-muted">
-            Signed in as <span className="font-medium text-fg">{user?.displayName}</span>.{" "}
+          <div className="ih-identity">
+            <span className="ih-avatar" aria-hidden="true">
+              {user?.displayName
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => Array.from(part)[0])
+                .join("")
+                .toUpperCase()}
+            </span>
+            <div>
+              <strong>{user?.displayName}</strong>
+              <small>Signed in with IdentityHub</small>
+            </div>
             <a
               href={`/login?return_to=${encodeURIComponent(here)}`}
-              className="text-link no-underline hover:underline"
+              className="ih-text-link"
               onClick={async (event) => {
                 event.preventDefault();
                 await fetch("/api/auth/logout", { method: "POST" });
@@ -170,16 +169,28 @@ function Authorize() {
             >
               Not you?
             </a>
+          </div>
+          <p className="mb-4 break-all text-xs text-muted">
+            Application: {consent.app.homepageUrl}
           </p>
-          <ul className="mt-4 grid gap-1 text-sm">
-            <li>
-              <span className="font-semibold">Identity</span>{" "}
-              <span className="text-muted">Your name, picture and email address</span>
+          <ul>
+            <li className="ih-permission">
+              <UserRound aria-hidden="true" />
+              <div>
+                <strong>Basic profile</strong>
+                <p>Your name, picture and email address</p>
+              </div>
+              <span className="ih-required">Required</span>
             </li>
             {view.scopes.map((scope) => (
-              <li key={scope}>
-                <span className="font-semibold capitalize">{scope}</span>{" "}
-                <span className="text-muted">{SCOPES[scope]}</span>
+              <li key={scope} className="ih-permission">
+                <ShieldCheck aria-hidden="true" />
+                <div>
+                  <strong>
+                    {scope === "publish" ? "Publishing access" : "Connected account profiles"}
+                  </strong>
+                  <p>{SCOPES[scope]} · Only for accounts you select below</p>
+                </div>
               </li>
             ))}
           </ul>
@@ -192,7 +203,7 @@ function Authorize() {
                   return (
                     <label
                       key={account.id}
-                      className={`flex min-h-11 items-center gap-3 rounded-2xl border border-line px-4 py-2 ${disabled ? "opacity-50" : "cursor-pointer"}`}
+                      className={`ih-account ${disabled ? "opacity-50" : ""}`}
                     >
                       <input
                         type="checkbox"
@@ -209,13 +220,13 @@ function Authorize() {
                       />
                       <PlatformIcon id={account.provider} className="size-5 shrink-0" />
                       <span className="min-w-0">
-                        <span className="block truncate font-medium">{account.displayName}</span>
-                        <span className="block truncate text-sm text-muted">
+                        <strong className="truncate">{account.displayName}</strong>
+                        <small>
                           {platformLabel(account.provider)} · {account.handle}
                           {disabled
                             ? " · cannot grant the requested access"
                             : ` · ${account.grantable.join(", ")}`}
-                        </span>
+                        </small>
                       </span>
                     </label>
                   );
@@ -245,28 +256,32 @@ function Authorize() {
             </details>
           ) : null}
           <ErrorNote message={error} />
-          <div className="mt-6 grid gap-2 sm:grid-cols-2">
+          <p className="mt-4 text-xs text-muted">
+            Only selected accounts are shared. You can remove this app's access later in your
+            workspace.
+          </p>
+          <div className="ih-consent-actions">
             <button
               type="button"
-              disabled={busy}
-              className="min-h-11 rounded-full bg-bg-alt px-4 text-sm font-semibold disabled:opacity-50"
-              onClick={() => finish(() => denyConsent({ data: request }))}
-            >
-              Deny
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              className="min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink disabled:opacity-50"
+              disabled={busy || !ready}
+              className="ih-primary ih-accent"
               onClick={() =>
                 finish(() => approveConsent({ data: { ...request, accountIds: selected } }))
               }
             >
-              Allow
+              {busy ? "Saving…" : "Allow"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !ready}
+              className="ih-text-link"
+              onClick={() => finish(() => denyConsent({ data: request }))}
+            >
+              Deny
             </button>
           </div>
         </>
       )}
-    </Page>
+    </AuthSurface>
   );
 }

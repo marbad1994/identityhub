@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { fetchEmbedParent, requestPasswordReset } from "@/lib/api";
 import { credentialFlags } from "@/lib/authorize-search";
+import { useHydrated } from "@/lib/use-hydrated";
 import { EmbedBridge } from "@/components/embed-bridge";
-import { ErrorNote, Page, SuccessNote } from "@/components/shell";
+import { ErrorNote, SuccessNote } from "@/components/shell";
+import { AuthSurface } from "@/components/auth-surface";
 import { inputClass, primaryButton } from "@/components/auth-forms";
 
 export const Route = createFileRoute("/forgot-password")({
@@ -15,19 +17,18 @@ export const Route = createFileRoute("/forgot-password")({
     embed: search.embed,
   }),
   loader: ({ deps }) =>
-    deps.embed === 1
-      ? fetchEmbedParent({ data: { returnTo: deps.returnTo, parentOrigin: deps.parentOrigin } })
-      : Promise.resolve({ allowed: false, appName: null as string | null }),
+    fetchEmbedParent({ data: { returnTo: deps.returnTo, parentOrigin: deps.parentOrigin } }),
   component: ForgotPassword,
 });
 
 function ForgotPassword() {
-  const { embed: embedFlag, parent_origin: parentOrigin } = Route.useSearch();
+  const { return_to: returnTo, embed: embedFlag, parent_origin: parentOrigin } = Route.useSearch();
   const parent = Route.useLoaderData();
   const embed = embedFlag === 1;
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ready = useHydrated();
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -48,15 +49,19 @@ function ForgotPassword() {
   };
 
   return (
-    <Page width="max-w-lg" embed={embed}>
+    <AuthSurface
+      embed={embed}
+      appName={parent.appName ?? "IdentityHub"}
+      appearance={parent.appearance}
+      title="Reset your password"
+      description="A little help getting in. We'll email you a link to choose a new password."
+    >
       {embed ? (
         <EmbedBridge parentOrigin={parentOrigin} allowed={parent.allowed} dismissOnEscape />
       ) : null}
       {embed && sent ? (
         <EmbedBridge parentOrigin={parentOrigin} allowed={parent.allowed} type="reset-sent" />
       ) : null}
-      <h1 className="text-4xl font-semibold tracking-tight">Reset your password</h1>
-      <p className="mt-3 text-muted">We will email you a link to choose a new one.</p>
       {sent ? (
         <SuccessNote
           message={
@@ -66,7 +71,7 @@ function ForgotPassword() {
           }
         />
       ) : (
-        <form onSubmit={submit} className="mt-8 grid gap-4">
+        <form method="post" onSubmit={submit} className="grid gap-4">
           <label className="block text-sm font-medium">
             Email
             <input
@@ -78,12 +83,24 @@ function ForgotPassword() {
               className={inputClass}
             />
           </label>
-          <button type="submit" disabled={busy} className={primaryButton}>
-            Send reset link
+          <button type="submit" disabled={busy || !ready} className={primaryButton}>
+            {busy ? "Sending link…" : "Send reset link"}
           </button>
           <ErrorNote message={error} />
         </form>
       )}
-    </Page>
+      <p className="ih-signup">
+        <Link
+          to="/login"
+          search={{
+            return_to: returnTo,
+            ...(embed ? { embed: 1 as const, parent_origin: parentOrigin } : {}),
+          }}
+          className="ih-text-link"
+        >
+          Back to sign-in
+        </Link>
+      </p>
+    </AuthSurface>
   );
 }

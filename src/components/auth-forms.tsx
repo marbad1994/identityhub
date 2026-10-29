@@ -7,11 +7,14 @@ import {
   type InputHTMLAttributes,
 } from "react";
 import { Link } from "@tanstack/react-router";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Mail } from "lucide-react";
 import { logIn, logInSecondFactor } from "@/lib/api";
 import { openPopup } from "@/lib/popup";
 import { postEmbed, reportEmbed } from "./embed-bridge";
 import { ErrorNote } from "./shell";
+import { PlatformButtons } from "./platform-buttons";
+import { AuthPrivacyNote } from "./auth-surface";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export const inputClass = "mt-1 w-full min-h-11 rounded-xl border border-line bg-bg px-3 text-base";
 export const primaryButton =
@@ -96,6 +99,7 @@ export function PasswordLogin({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const popupRef = useRef<Window | null>(null);
+  const ready = useHydrated();
 
   useEffect(() => {
     if (!embed) return;
@@ -223,7 +227,7 @@ export function PasswordLogin({
 
   if (step === "code") {
     return (
-      <form onSubmit={submitCode} className="grid gap-3">
+      <form method="post" onSubmit={submitCode} className="grid gap-3">
         <label className="block text-sm font-medium">
           Code from your authenticator app
           <input
@@ -239,7 +243,7 @@ export function PasswordLogin({
             Lost your phone? Enter one of your recovery codes instead.
           </span>
         </label>
-        <button type="submit" disabled={busy} className={primaryButton}>
+        <button type="submit" disabled={busy || !ready} className={primaryButton}>
           Verify
         </button>
         <ErrorNote message={error} />
@@ -248,7 +252,7 @@ export function PasswordLogin({
   }
 
   return (
-    <form onSubmit={submitPassword} className="grid gap-3">
+    <form method="post" onSubmit={submitPassword} className="grid gap-3">
       <label className="block text-sm font-medium">
         Email
         <input
@@ -267,11 +271,11 @@ export function PasswordLogin({
         autoComplete="current-password"
         maxLength={1024}
       />
-      <button type="submit" disabled={busy} className={primaryButton}>
-        Sign in
+      <button type="submit" disabled={busy || !ready} className={primaryButton}>
+        {busy ? "Signing in…" : "Sign in"}
       </button>
       <ErrorNote message={error} />
-      <p className="flex flex-wrap justify-between gap-2 text-sm">
+      <p className="ih-form-links flex flex-wrap justify-between gap-2 text-sm">
         <Link
           to="/forgot-password"
           search={linkSearch}
@@ -284,6 +288,77 @@ export function PasswordLogin({
         </Link>
       </p>
     </form>
+  );
+}
+
+/** Production method chooser: only configured methods, with credentials kept on the hub. */
+export function SignInChoices({
+  methods,
+  returnTo,
+  popup = true,
+  emailFirst = false,
+}: {
+  methods: { id: string; label: string }[];
+  returnTo: string;
+  popup?: boolean;
+  emailFirst?: boolean;
+}) {
+  const platforms = methods.filter((method) => method.id !== "password");
+  const password = methods.some((method) => method.id === "password");
+  const [email, setEmail] = useState(emailFirst || platforms.length === 0);
+  const ready = useHydrated();
+  return (
+    <>
+      {email && password ? (
+        <>
+          {platforms.length ? (
+            <button
+              type="button"
+              disabled={!ready}
+              className="ih-back"
+              onClick={() => setEmail(false)}
+            >
+              <ArrowLeft aria-hidden="true" /> Other ways to sign in
+            </button>
+          ) : null}
+          <PasswordLogin returnTo={returnTo} />
+        </>
+      ) : (
+        <>
+          <PlatformButtons
+            platforms={platforms}
+            intent="login"
+            returnTo={returnTo}
+            verb="Continue with"
+            popup={popup}
+            appearance="auth"
+          />
+          {password ? (
+            <>
+              {platforms.length ? <div className="ih-divider">or use email</div> : null}
+              <button
+                className="ih-primary"
+                type="button"
+                disabled={!ready}
+                onClick={() => setEmail(true)}
+              >
+                <Mail aria-hidden="true" /> Continue with email
+              </button>
+              <p className="ih-signup">
+                New here?{" "}
+                <Link to="/signup" search={{ return_to: returnTo }} className="ih-text-link">
+                  Create an account
+                </Link>
+              </p>
+            </>
+          ) : null}
+        </>
+      )}
+      {methods.length === 0 ? (
+        <p className="text-sm text-muted">No sign-in method is configured on this hub yet.</p>
+      ) : null}
+      <AuthPrivacyNote />
+    </>
   );
 }
 

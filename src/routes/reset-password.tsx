@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { checkResetToken, resetPassword } from "@/lib/api";
-import { ErrorNote, Page } from "@/components/shell";
+import { ErrorNote } from "@/components/shell";
+import { AuthSurface } from "@/components/auth-surface";
 import { NEW_PASSWORD_HINT, PasswordField, primaryButton } from "@/components/auth-forms";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export const Route = createFileRoute("/reset-password")({
   // The token is a credential: keep it out of the Referer of anything this page loads.
@@ -25,6 +27,7 @@ function ResetPassword() {
   const { token } = Route.useSearch();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ready = useHydrated();
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,8 +54,10 @@ function ResetPassword() {
   };
 
   return (
-    <Page width="max-w-lg">
-      <h1 className="text-4xl font-semibold tracking-tight">Choose a new password</h1>
+    <AuthSurface
+      title="Choose a new password"
+      description="A fresh password for your IdentityHub account."
+    >
       {!valid ? (
         <>
           <ErrorNote message="This reset link expired or was already used." />
@@ -63,7 +68,7 @@ function ResetPassword() {
           </p>
         </>
       ) : (
-        <form onSubmit={submit} className="mt-8 grid gap-4">
+        <form method="post" onSubmit={submit} className="grid gap-4">
           <PasswordField
             label="New password"
             name="password"
@@ -80,8 +85,8 @@ function ResetPassword() {
             maxLength={256}
             autoComplete="new-password"
           />
-          <button type="submit" disabled={busy} className={primaryButton}>
-            Save password
+          <button type="submit" disabled={busy || !ready} className={primaryButton}>
+            {busy ? "Saving password…" : "Save password"}
           </button>
           <ErrorNote message={error} />
           <p className="text-sm text-muted">
@@ -89,6 +94,6 @@ function ResetPassword() {
           </p>
         </form>
       )}
-    </Page>
+    </AuthSurface>
   );
 }

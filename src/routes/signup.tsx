@@ -2,8 +2,10 @@ import { useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { fetchEmbedParent, signUp } from "@/lib/api";
 import { EmbedBridge } from "@/components/embed-bridge";
-import { ErrorNote, Page, SuccessNote } from "@/components/shell";
+import { ErrorNote, SuccessNote } from "@/components/shell";
+import { AuthSurface } from "@/components/auth-surface";
 import { credentialFlags } from "@/lib/authorize-search";
+import { useHydrated } from "@/lib/use-hydrated";
 import {
   NEW_PASSWORD_HINT,
   PasswordField,
@@ -20,9 +22,7 @@ export const Route = createFileRoute("/signup")({
     embed: search.embed,
   }),
   loader: ({ deps }) =>
-    deps.embed === 1
-      ? fetchEmbedParent({ data: { returnTo: deps.returnTo, parentOrigin: deps.parentOrigin } })
-      : Promise.resolve({ allowed: false, appName: null as string | null }),
+    fetchEmbedParent({ data: { returnTo: deps.returnTo, parentOrigin: deps.parentOrigin } }),
   component: SignUp,
 });
 
@@ -44,6 +44,7 @@ function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ready = useHydrated();
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -69,15 +70,20 @@ function SignUp() {
   };
 
   return (
-    <Page width="max-w-lg" embed={embed}>
+    <AuthSurface
+      embed={embed}
+      appName={parent.appName ?? "IdentityHub"}
+      appearance={parent.appearance}
+      title="Create an account"
+      description={`A fresh start. One account for ${parent.appName ?? "the Makketing suite"}.`}
+    >
       {embed ? (
         <EmbedBridge parentOrigin={parentOrigin} allowed={parent.allowed} dismissOnEscape />
       ) : null}
-      <h1 className="text-4xl font-semibold tracking-tight">Create an account</h1>
       {sent ? (
         <SuccessNote message={sent} />
       ) : (
-        <form onSubmit={submit} className="mt-8 grid gap-4">
+        <form method="post" onSubmit={submit} className="grid gap-4">
           <label className="block text-sm font-medium">
             Name
             <input name="name" required autoComplete="name" maxLength={80} className={inputClass} />
@@ -102,18 +108,18 @@ function SignUp() {
             autoComplete="new-password"
             hint={NEW_PASSWORD_HINT}
           />
-          <button type="submit" disabled={busy} className={primaryButton}>
-            Create account
+          <button type="submit" disabled={busy || !ready} className={primaryButton}>
+            {busy ? "Creating account…" : "Create account"}
           </button>
           <ErrorNote message={error} />
         </form>
       )}
       <p className="mt-6 text-sm text-muted">
         Already have an account?{" "}
-        <Link to="/login" search={linkSearch} className="text-link no-underline hover:underline">
+        <Link to="/login" search={linkSearch} className="ih-text-link">
           Sign in
         </Link>
       </p>
-    </Page>
+    </AuthSurface>
   );
 }

@@ -4,6 +4,12 @@ One login for the Makketing suite. People sign in with a social platform they al
 
 Supported: X, Instagram, Facebook (one account per Page), TikTok, LinkedIn, YouTube, Reddit, and Snapchat (sign-in only: Snap has no posting API, so Snapchat accounts only ever carry `profile`). The OAuth details per platform mirror SocialPostAPI's connectors.
 
+## Widget design playground
+
+Run `npm run preview:widget` and open <http://127.0.0.1:4178/widget-demo.html>. This standalone prototype needs no database or environment settings. It includes X and TikTok demo popups that close automatically, email sign-in/sign-up/reset previews, permission review, a simulated return to the app, and interruption/retry scenarios. Change the application name, theme, accent, or preview width with the controls.
+
+All accounts and credentials are examples; the demo sends no email, connects no accounts, and stores no session. The production widget uses the same visual design with real authentication. App owners can save light/dark appearance and Sage, Ocean, or Iris accents on the Widget tab; the selection also styles the hub credential frames and consent screen. Email sign-in and sign-up appear only when enabled for the app and configured on the hub. The static demo is available at `/widget-demo.html` after deployment. `npm run test:widget-demo` checks the demo interactions in headless Chromium; set `E2E_CHROMIUM` if needed and `E2E_SCREENSHOTS` to save screenshots.
+
 ## How it works
 
 1. **Sign in** at `/login` with any configured platform, or with email and password (`/signup`, confirmed by an emailed link). The first platform sign-in creates the user and connects that account. People who started with a platform can add an email and password in `/settings`, and turn on authenticator-app two-factor there.

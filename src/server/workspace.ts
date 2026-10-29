@@ -12,6 +12,7 @@ import { logActivity } from "./activity";
 import type { Queryable } from "./db";
 import { forgetFrameAncestors } from "./frame-ancestors";
 import type { SessionUser } from "./session";
+import { WIDGET_ACCENTS, type WidgetAccent } from "@/lib/widget-appearance";
 
 export type AccountView = {
   id: string;
@@ -50,6 +51,7 @@ export type DeveloperAppView = {
   /** What the widget shows today. */
   methods: MethodView[];
   widgetTheme: "light" | "dark";
+  widgetAccent: WidgetAccent;
 };
 
 export type DeveloperAppListItem = DeveloperAppView & { memberCount: number };
@@ -284,12 +286,13 @@ type AppRow = {
   created_at: Date;
   sign_in_methods: string[];
   widget_theme: "light" | "dark";
+  widget_accent: WidgetAccent;
 };
 
 /** Same ceiling as the error string from createApp. */
 export const APP_CAP = 25;
 
-const APP_COLUMNS = `id, name, homepage_url, redirect_uris, client_id, created_at, sign_in_methods, widget_theme`;
+const APP_COLUMNS = `id, name, homepage_url, redirect_uris, client_id, created_at, sign_in_methods, widget_theme, widget_accent`;
 
 function appView(app: AppRow): DeveloperAppView {
   return {
@@ -302,6 +305,7 @@ function appView(app: AppRow): DeveloperAppView {
     signInMethods: app.sign_in_methods,
     methods: effectiveMethods(app.sign_in_methods),
     widgetTheme: app.widget_theme,
+    widgetAccent: app.widget_accent,
   };
 }
 
@@ -540,15 +544,18 @@ export async function removeAppMember(
 /** Save which sign-in methods the app's widget and consent screen offer, and the widget theme. */
 export async function updateWidget(
   userId: string,
-  input: { appId: string; methods: string[]; theme: string },
+  input: { appId: string; methods: string[]; theme: string; accent?: string },
 ): Promise<Result<{ app: DeveloperAppView }>> {
   const methods = [...new Set(input.methods)].filter(isMethod);
   if (methods.length === 0) return { ok: false, error: "Keep at least one sign-in method." };
   if (input.theme !== "light" && input.theme !== "dark")
     return { ok: false, error: "Choose light or dark." };
+  if (input.accent !== undefined && !WIDGET_ACCENTS.includes(input.accent as WidgetAccent))
+    return { ok: false, error: "Choose a supported accent color." };
   const app = await one<AppRow>(
-    `update apps set sign_in_methods = $3, widget_theme = $4 where id = $1 and owner_id = $2 returning ${APP_COLUMNS}`,
-    [input.appId, userId, methods, input.theme],
+    `update apps set sign_in_methods = $3, widget_theme = $4, widget_accent = coalesce($5, widget_accent) where id = $1 and owner_id = $2 returning ${APP_COLUMNS}`,
+    [input.appId, userId, methods, input.theme, input.accent ?? null],
   );
+  if (app) forgetFrameAncestors(app.client_id);
   return app ? { ok: true, app: appView(app) } : { ok: false, error: "That app is not yours." };
 }

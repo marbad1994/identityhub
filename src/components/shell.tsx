@@ -23,9 +23,13 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-5">
-        <Link to="/" className="flex items-center gap-2.5 text-fg no-underline">
+        <Link
+          to="/"
+          aria-label="IdentityHub"
+          className="flex items-center gap-2.5 text-fg no-underline"
+        >
           <Mark className="size-7" />
-          <span className="text-base font-bold tracking-tight">
+          <span className="hidden text-base font-bold tracking-tight sm:inline">
             Identity<span className="font-semibold text-muted"> Hub</span>
           </span>
         </Link>

@@ -200,6 +200,7 @@ export const saveWidget = createServerFn({ method: "POST" })
       appId: z.string().max(64),
       methods: z.array(z.string().max(20)).max(20),
       theme: z.string().max(10),
+      accent: z.enum(["sage", "blue", "violet"]).optional(),
     }),
   )
   .handler(async ({ context, data }) => {

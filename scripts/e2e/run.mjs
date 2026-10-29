@@ -133,9 +133,16 @@ async function newPerson(browser, person, { blockPopups = false } = {}) {
     return route.fulfill({ status: 200, body: "app callback" });
   });
   const page = await context.newPage();
+  const expected404s = new Set();
   page.on("dialog", (dialog) => dialog.accept());
   // Any CSP violation or script error on a hub page fails the run.
   page.on("console", (message) => {
+    // The non-owner check below deliberately navigates to one known 404.
+    if (
+      expected404s.has(message.location().url) &&
+      /^Failed to load resource:.*\b404\b/.test(message.text())
+    )
+      return;
     if (message.type() === "error" && message.location().url.startsWith(HUB))
       consoleErrors.push(`${page.url()}: ${message.text()}`);
   });
@@ -144,7 +151,7 @@ async function newPerson(browser, person, { blockPopups = false } = {}) {
     page.on("requestfailed", (request) =>
       console.log("\n  request failed:", request.url(), request.failure()?.errorText),
     );
-  return { context, page, captured };
+  return { context, page, captured, expected404s };
 }
 
 const consoleErrors = [];
@@ -291,7 +298,7 @@ async function main() {
       await alice.page.getByRole("link", { name: "Widget", exact: true }).click();
       await alice.page.getByRole("heading", { name: "Sign-in widget" }).waitFor();
       await alice.page.getByRole("button", { name: "Continue with Facebook" }).waitFor();
-      await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
+      await alice.page.getByRole("button", { name: "Create an account" }).waitFor();
       app.builderUrl = alice.page.url();
     });
 
@@ -454,12 +461,16 @@ async function main() {
 
     await step("owner sees a grant; a signed-in non-owner gets not found", async () => {
       await alice.page.goto(`${HUB}/apps/${app.id}/grants`);
-      await alice.page.getByText("alice on X").waitFor();
+      await alice.page.getByText("alice on X").first().waitFor();
       await alice.page.getByText("Granted").first().waitFor();
       assert.equal(await alice.page.getByText("No grants or tokens yet.").count(), 0);
-      await bob.page.goto(`${HUB}/apps/${app.id}/grants`);
+      const privatePage = `${HUB}/apps/${app.id}/grants`;
+      bob.expected404s.add(privatePage);
+      const denied = await bob.page.goto(privatePage);
+      assert.equal(denied.status(), 404, "Another app's grants stay hidden");
       await bob.page.getByText("Not Found").waitFor();
       assert.equal(await bob.page.getByText("No grants or tokens yet.").count(), 0);
+      bob.expected404s.delete(privatePage);
     });
 
     await step("security headers on pages; cross-site form posts are refused", async () => {
@@ -489,9 +500,14 @@ async function main() {
       });
       assert.equal(forged.status, 403);
       const authorizeEmbed = await fetch(`${HUB}/authorize?embed=1`);
-      assert.match(authorizeEmbed.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
+      assert.match(
+        authorizeEmbed.headers.get("content-security-policy") ?? "",
+        /frame-ancestors 'none'/,
+      );
       assert.equal(authorizeEmbed.headers.get("x-frame-options"), "DENY");
-      const sibling = await fetch(`${HUB}/login?embed=1&client_id=${encodeURIComponent(app.clientId)}`);
+      const sibling = await fetch(
+        `${HUB}/login?embed=1&client_id=${encodeURIComponent(app.clientId)}`,
+      );
       assert.match(sibling.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
       assert.equal(sibling.headers.get("x-frame-options"), "DENY");
       const returnTo = `/authorize?${new URLSearchParams({
@@ -506,6 +522,34 @@ async function main() {
       assert.match(framedCsp, /https:\/\/socialpostapi\.makketing\.com/);
       assert.equal(framed.headers.get("x-frame-options"), null);
     });
+
+    await step(
+      "credential actions wait for hydration and passwords cannot submit in a URL",
+      async () => {
+        const context = await browser.newContext({ javaScriptEnabled: false });
+        try {
+          const page = await context.newPage();
+          await page.goto(`${HUB}/login`);
+          assert.equal(
+            await page.getByRole("button", { name: "Continue with email" }).isDisabled(),
+            true,
+          );
+          for (const path of ["/signup", "/forgot-password"]) {
+            await page.goto(`${HUB}${path}`);
+            assert.equal(await page.locator("form").getAttribute("method"), "post");
+            assert.equal(await page.locator('button[type="submit"]').isDisabled(), true);
+          }
+          await page.goto(`${authorizeUrl("pre-hydration")}&method=password`);
+          assert.equal(await page.locator("form").getAttribute("method"), "post");
+          assert.equal(
+            await page.getByRole("button", { name: "Sign in", exact: true }).isDisabled(),
+            true,
+          );
+        } finally {
+          await context.close();
+        }
+      },
+    );
 
     const CAROL = "carol@example.com";
     let carolPassword = "violet tractor mountain lamp";
@@ -574,6 +618,7 @@ async function main() {
 
     const passwordLogin = async (person, email, password) => {
       await person.page.goto(`${HUB}/login`);
+      await person.page.getByRole("button", { name: "Continue with email" }).click();
       await person.page.getByLabel("Email").fill(email);
       await person.page.getByLabel("Password", { exact: true }).fill(password);
       const done = serverFnDone(person.page);
@@ -683,7 +728,7 @@ async function main() {
           false,
         );
         await alice.page.getByRole("button", { name: "Continue with Facebook" }).waitFor();
-        await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
+        await alice.page.getByRole("button", { name: "Create an account" }).waitFor();
         for (const label of [
           "Instagram",
           "Facebook",
@@ -696,10 +741,11 @@ async function main() {
           await alice.page.getByRole("checkbox", { name: label, exact: true }).uncheck();
         }
         await alice.page.getByRole("radio", { name: "dark" }).check();
+        await alice.page.getByRole("radio", { name: "Ocean", exact: true }).check();
         await alice.page.getByText("All changes saved").waitFor();
         await alice.page.getByRole("button", { name: "Continue with X" }).waitFor();
-        await alice.page.getByRole("button", { name: "Continue with Email" }).waitFor();
-        await alice.page.getByRole("button", { name: "Sign up with email" }).waitFor();
+        await alice.page.getByRole("button", { name: "Continue with email" }).waitFor();
+        await alice.page.getByRole("button", { name: "Create an account" }).waitFor();
         assert.equal(
           await alice.page.getByRole("button", { name: "Continue with Facebook" }).count(),
           0,
@@ -719,6 +765,32 @@ async function main() {
           ["twitter", "password"],
         );
         assert.equal(body.theme, "dark");
+        assert.equal(body.accent, "blue");
+        assert.ok(
+          await alice.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+          "Builder has no horizontal overflow on desktop",
+        );
+        await alice.page.setViewportSize({ width: 375, height: 812 });
+        assert.ok(
+          await alice.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+          "Builder has no horizontal overflow on mobile",
+        );
+        await shot(alice.page, "widget-builder-mobile");
+        await alice.page.setViewportSize({ width: 1200, height: 900 });
+        await alice.page.reload();
+        assert.equal(
+          await alice.page.getByRole("radio", { name: "Ocean", exact: true }).isChecked(),
+          true,
+        );
+        await alice.page.getByRole("checkbox", { name: "Email and password" }).uncheck();
+        await alice.page.getByText("All changes saved").waitFor();
+        assert.equal(
+          await alice.page.getByRole("button", { name: "Create an account" }).count(),
+          0,
+          "Email signup is hidden when the app disables email",
+        );
+        await alice.page.getByRole("checkbox", { name: "Email and password" }).check();
+        await alice.page.getByText("All changes saved").waitFor();
       },
     );
 
@@ -736,7 +808,7 @@ async function main() {
         );
         await carol.page.goto("http://localhost:3472/shop");
         await carol.page.getByRole("button", { name: "Sign in", exact: true }).click();
-        await carol.page.getByRole("button", { name: "Continue with Email" }).click();
+        await carol.page.getByRole("button", { name: "Continue with email" }).click();
         assert.equal(
           carol.page.url(),
           "http://localhost:3472/shop",
@@ -744,11 +816,14 @@ async function main() {
         );
         const frame = carol.page.frameLocator('iframe[title="Sign in with Identity Hub"]');
         await frame.getByRole("button", { name: "Continue", exact: true }).waitFor();
+        assert.equal(await frame.locator(".ih-auth").getAttribute("data-theme"), "dark");
+        assert.equal(await frame.locator(".ih-auth").getAttribute("data-accent"), "blue");
         const [popup] = await Promise.all([
           carol.page.waitForEvent("popup"),
           frame.getByRole("button", { name: "Continue", exact: true }).click(),
         ]);
         await popup.getByRole("heading", { name: "Sign in to SocialPostAPI" }).waitFor();
+        assert.equal(await popup.locator(".ih-auth").getAttribute("data-accent"), "blue");
         await popup.getByText("SocialPostAPI will only learn who you are.").waitFor();
         await shot(popup, "widget-popup");
         await popup.getByRole("button", { name: "Allow" }).click();
@@ -776,6 +851,40 @@ async function main() {
         assert.equal(exchanged.status, 200, JSON.stringify(exchanged.body));
         assert.equal(exchanged.body.user.email, CAROL);
         assert.deepEqual(exchanged.body.accounts, []);
+      },
+    );
+
+    await step(
+      "blocked widget popup falls back to top-level consent without an orphaned relay",
+      async () => {
+        await carol.page.goto("http://localhost:3472/shop");
+        await carol.page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
+        const config = await (await fetch(`${HUB}/api/v1/widget/${app.clientId}`)).json();
+        await carol.page.evaluate(
+          async ({ hub, clientId, redirectUri, config }) => {
+            await window.IdentityHub.mount(document.getElementById("identity-hub"), {
+              hub,
+              clientId,
+              redirectUri,
+              scope: "profile",
+              presentation: "popup",
+              config,
+            });
+            window.open = () => null;
+          },
+          { hub: HUB, clientId: app.clientId, redirectUri: APP_REDIRECT, config },
+        );
+        await carol.page.getByRole("button", { name: "Sign in", exact: true }).click();
+        await carol.page.getByRole("button", { name: "Continue with email" }).click();
+        await carol.page.getByRole("heading", { name: "Sign in to SocialPostAPI" }).waitFor();
+        assert.equal(new URL(carol.page.url()).searchParams.has("relay"), false);
+        await carol.page.getByRole("button", { name: "Allow", exact: true }).click();
+        await carol.page.waitForURL(`${APP_REDIRECT}**`);
+        assert.match(carol.captured.at(-1).searchParams.get("code"), /^code_/);
+        const stateCookie = (await carol.context.cookies("http://localhost:3472")).find(
+          (cookie) => cookie.name === "ihub_state",
+        );
+        assert.equal(carol.captured.at(-1).searchParams.get("state"), stateCookie.value);
       },
     );
 

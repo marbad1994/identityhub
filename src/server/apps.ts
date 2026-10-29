@@ -20,6 +20,7 @@ import { listAccounts, type AccountView, type Result } from "./workspace";
 import { effectiveMethods, type MethodView } from "./methods";
 import { completeRelay, relayHash, validRelay } from "./relay";
 import { appOrigin, env } from "./env";
+import { widgetAppearance, type WidgetAppearance } from "@/lib/widget-appearance";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -33,11 +34,12 @@ type AppRow = {
   client_secret_hash: string;
   sign_in_methods: string[];
   widget_theme: "light" | "dark";
+  widget_accent: string;
 };
 
 async function appByClientId(clientId: string): Promise<AppRow | undefined> {
   return one<AppRow>(
-    `select id, name, homepage_url, redirect_uris, client_secret_hash, sign_in_methods, widget_theme from apps where client_id = $1`,
+    `select id, name, homepage_url, redirect_uris, client_secret_hash, sign_in_methods, widget_theme, widget_accent from apps where client_id = $1`,
     [clientId],
   );
 }
@@ -50,6 +52,7 @@ export async function widgetConfig(clientId: string) {
     name: app.name,
     hub_origin: appOrigin(),
     theme: app.widget_theme,
+    accent: app.widget_accent,
     methods: effectiveMethods(app.sign_in_methods),
     redirect_uris: app.redirect_uris,
     // WIDGET_MODAL=0 is the popup escape hatch. Unset stays the frame.
@@ -80,7 +83,12 @@ async function deliver(
   return { ok: true, redirect, relayed: true };
 }
 
-export type ConsentApp = { name: string; homepageUrl: string; methods: MethodView[] };
+export type ConsentApp = {
+  name: string;
+  homepageUrl: string;
+  methods: MethodView[];
+  appearance: WidgetAppearance;
+};
 
 export type ConsentView = {
   app: ConsentApp;
@@ -101,7 +109,12 @@ export async function consentView(
   if (scopes.length === 0)
     return { ok: false, error: "scope must include profile and/or publish." };
   const methods = effectiveMethods(app.sign_in_methods);
-  const summary = { name: app.name, homepageUrl: app.homepage_url, methods };
+  const summary = {
+    name: app.name,
+    homepageUrl: app.homepage_url,
+    methods,
+    appearance: widgetAppearance(app.widget_theme, app.widget_accent),
+  };
   // An app that limits its platforms only sees accounts on those platforms.
   const platforms = new Set<string>(methods.map((method) => method.id));
   if (!userId) return { ok: true, view: null, app: summary };
