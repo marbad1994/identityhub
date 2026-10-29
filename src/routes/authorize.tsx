@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { approveConsent, denyConsent, fetchConsent } from "@/lib/api";
-import { platformLabel, SCOPES } from "@/lib/platforms";
+import { platformInfo, platformLabel, SCOPES } from "@/lib/platforms";
 import { authorizePath, authorizeSearch, type AuthorizeSearch } from "@/lib/authorize-search";
 import { PlatformIcon } from "@/components/marks";
 import { CheckCircle2, ShieldCheck, UserRound } from "lucide-react";
@@ -82,7 +82,9 @@ function Authorize() {
   }
 
   const methods = consent.app.methods;
-  const platforms = methods.filter((method) => method.id !== "password");
+  const platforms = methods.filter(
+    (method) => method.id !== "password" && !platformInfo(method.id)?.identityOnly,
+  );
 
   const finish = async (
     work: () => Promise<

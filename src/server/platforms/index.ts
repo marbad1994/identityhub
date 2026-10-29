@@ -1,6 +1,7 @@
 import type { PlatformId } from "@/lib/platforms";
 import { appOrigin, env } from "../env";
 import { facebook } from "./facebook";
+import { google } from "./google";
 import { instagram } from "./instagram";
 import { linkedin } from "./linkedin";
 import { reddit } from "./reddit";
@@ -11,6 +12,7 @@ import type { Credentials, Platform } from "./types";
 import { youtube } from "./youtube";
 
 const REGISTRY: Record<PlatformId, Platform> = {
+  google,
   twitter,
   instagram,
   facebook,
@@ -30,6 +32,10 @@ export function credentialNames(p: Platform): [string, string] {
 }
 
 export function credentials(p: Platform): Credentials | null {
+  // An existing YouTube web client can also perform ordinary Google sign-in.
+  // A partially configured dedicated client must not silently use another one.
+  if (p.id === "google" && !env("GOOGLE_CLIENT_ID") && !env("GOOGLE_CLIENT_SECRET"))
+    return credentials(youtube);
   const [idName, secretName] = credentialNames(p);
   const clientId = env(idName);
   const clientSecret = env(secretName);
@@ -50,6 +56,11 @@ export function enabledPlatforms(): PlatformId[] {
  * app needs a new redirect URI.
  */
 export function callbackUrl(id: PlatformId): string {
+  if (id === "google") {
+    // Google sign-in always returns directly to the hub, independently of
+    // SocialPostAPI's publishing connectors, even when sharing the web client.
+    return `${appOrigin()}/api/auth/google/callback`;
+  }
   const base = env("PLATFORM_CALLBACK_BASE")?.replace(/\/+$/, "");
   return base ? `${base}/${id}/callback` : `${appOrigin()}/api/auth/callback/${id}`;
 }

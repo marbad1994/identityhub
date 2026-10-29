@@ -132,6 +132,10 @@ const handlers = {
       refresh_token: "rt",
       expires_in: 3600,
     }),
+  "openidconnect.googleapis.com": async (url, init) => {
+    const person = personFrom(init, url);
+    return json({ sub: `google-${person}`, name: `${person} on Google` });
+  },
   "www.googleapis.com": async (url, init) => {
     const person = personFrom(init, url);
     return json({

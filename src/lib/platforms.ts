@@ -13,16 +13,27 @@ export type ScopeId = keyof typeof SCOPES;
 export const SCOPE_IDS = Object.keys(SCOPES) as ScopeId[];
 
 export type PlatformId =
-  "twitter" | "instagram" | "facebook" | "tiktok" | "linkedin" | "youtube" | "reddit" | "snapchat";
+  | "google"
+  | "twitter"
+  | "instagram"
+  | "facebook"
+  | "tiktok"
+  | "linkedin"
+  | "youtube"
+  | "reddit"
+  | "snapchat";
 
 export type PlatformInfo = {
   id: PlatformId;
   label: string;
   /** Hub scopes a connection on this platform can grant to products. */
   scopes: ScopeId[];
+  /** Identity-only providers have no publishing account to connect or share. */
+  identityOnly?: boolean;
 };
 
 export const PLATFORMS: PlatformInfo[] = [
+  { id: "google", label: "Google", scopes: [], identityOnly: true },
   { id: "twitter", label: "X", scopes: ["profile", "publish"] },
   { id: "instagram", label: "Instagram", scopes: ["profile", "publish"] },
   { id: "facebook", label: "Facebook", scopes: ["profile", "publish"] },

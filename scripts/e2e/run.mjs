@@ -110,7 +110,11 @@ async function newPerson(browser, person, { blockPopups = false } = {}) {
   await context.route(`${HUB}/api/auth/start**`, async (route) => {
     const response = await route.fetch({ maxRedirects: 0 });
     const location = new URL(response.headers().location, HUB);
-    const platform = AUTHORIZE_PAGES[`${location.host}${location.pathname}`];
+    const requestedPlatform = new URL(route.request().url()).searchParams.get("platform");
+    const platform =
+      requestedPlatform === "google" && location.host === "accounts.google.com"
+        ? "google"
+        : AUTHORIZE_PAGES[`${location.host}${location.pathname}`];
     if (!platform) return route.fulfill({ response });
     assert.match(
       location.searchParams.get("state") ?? "",
@@ -121,9 +125,18 @@ async function newPerson(browser, person, { blockPopups = false } = {}) {
     // forwards hub states to the hub; going straight to the hub stands in for that.
     assert.equal(
       location.searchParams.get("redirect_uri"),
-      `${SPA_CALLBACK_BASE}/${platform}/callback`,
+      platform === "google"
+        ? `${HUB}/api/auth/google/callback`
+        : `${SPA_CALLBACK_BASE}/${platform}/callback`,
     );
-    const back = `${HUB}/api/auth/callback/${platform}?code=${person}&state=${encodeURIComponent(location.searchParams.get("state"))}`;
+    if (platform === "google") {
+      assert.equal(location.searchParams.get("scope"), "openid profile");
+      assert.equal(location.searchParams.get("code_challenge_method"), "S256");
+      assert.ok(location.searchParams.get("code_challenge"));
+    }
+    const callback =
+      platform === "google" ? "/api/auth/google/callback" : `/api/auth/callback/${platform}`;
+    const back = `${HUB}${callback}?code=${person}&state=${encodeURIComponent(location.searchParams.get("state"))}`;
     return route.fulfill({ status: 302, headers: { location: back } });
   });
   // Anything else external (web fonts) is not needed and may not be reachable.
@@ -244,6 +257,51 @@ async function main() {
     let code;
     let aliceToken;
 
+    await step(
+      "Google login uses the exact callback, closes its popup and reuses the stable identity",
+      async () => {
+        const google = await newPerson(browser, "google-test");
+        try {
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            await google.page.goto(`${HUB}/login`);
+            const [popup] = await Promise.all([
+              google.page.waitForEvent("popup"),
+              google.page.getByRole("link", { name: "Continue with Google", exact: true }).click(),
+            ]);
+            await google.page.waitForURL(`${HUB}/workspace`);
+            if (!popup.isClosed()) await popup.waitForEvent("close");
+            await google.page.getByRole("heading", { name: "google-test on Google" }).waitFor();
+            assert.equal(
+              await google.page.getByRole("link", { name: "Connect Google", exact: true }).count(),
+              0,
+            );
+            const identity = await db.query(
+              "select user_id from user_logins where provider = 'google' and subject = 'google-google-test'",
+            );
+            assert.equal(identity.rows.length, 1);
+            const accounts = await db.query(
+              "select count(*)::int as n from accounts where user_id = $1",
+              [identity.rows[0].user_id],
+            );
+            assert.equal(
+              accounts.rows[0].n,
+              0,
+              "No Google or YouTube tokens retained for identity login",
+            );
+            await google.page.getByRole("button", { name: "Sign out" }).first().click();
+            await google.page.waitForURL(`${HUB}/`);
+          }
+          const count = await db.query("select count(*)::int as n from users");
+          assert.equal(count.rows[0].n, 1, "Repeat Google login does not create a second user");
+        } finally {
+          await google.context.close();
+          await db.query(
+            "delete from users where id in (select user_id from user_logins where provider = 'google')",
+          );
+        }
+      },
+    );
+
     await step("sign in with X creates a user and connects the account", async () => {
       await alice.page.goto(`${HUB}/login`);
       const [popup] = await Promise.all([
@@ -315,6 +373,99 @@ async function main() {
 
     const authorizeUrl = (state, redirect = APP_REDIRECT) =>
       `${HUB}/authorize?${new URLSearchParams({ client_id: app.clientId, redirect_uri: redirect, scope: "profile publish", state })}`;
+
+    await step("Google widget option completes consent with identity only", async () => {
+      const google = await newPerson(browser, "google-widget", { blockPopups: true });
+      try {
+        await alice.page.goto(app.builderUrl);
+        await alice.page.getByRole("checkbox", { name: "Google", exact: true }).waitFor();
+        await alice.page
+          .getByRole("button", { name: "Continue with Google", exact: true })
+          .waitFor();
+        await alice.page.getByRole("checkbox", { name: "Google", exact: true }).uncheck();
+        await savedWidget(
+          app.clientId,
+          (config) => !config.methods.some((method) => method.id === "google"),
+        );
+        await alice.page.getByRole("checkbox", { name: "Google", exact: true }).check();
+        const config = await savedWidget(app.clientId, (config) =>
+          config.methods.some((method) => method.id === "google"),
+        );
+        assert.ok(config.methods.some((method) => method.id === "google"));
+        // Playwright skips routing requests in an HTTP redirect chain. Inspect
+        // the real authorize redirect, then enter its start URL so the provider
+        // mock can intercept Google's authorization request.
+        const authorize = await google.context.request.get(
+          `${authorizeUrl("google-widget-state")}&method=google`,
+          { maxRedirects: 0 },
+        );
+        assert.ok([302, 303, 307].includes(authorize.status()));
+        const start = new URL(authorize.headers().location, HUB);
+        assert.equal(start.pathname, "/api/auth/start");
+        assert.equal(start.searchParams.get("platform"), "google");
+        await google.page.goto(start.href);
+        await google.page.getByRole("button", { name: "Allow", exact: true }).waitFor();
+        await google.page
+          .getByText("SocialPostAPI will only learn who you are.", { exact: false })
+          .waitFor();
+        assert.equal(
+          await google.page.getByRole("link", { name: "Connect Google", exact: true }).count(),
+          0,
+        );
+        await google.page.getByRole("button", { name: "Allow", exact: true }).click();
+        await google.page.waitForURL(`${APP_REDIRECT}**`);
+        const back = google.captured.at(-1);
+        assert.equal(back.searchParams.get("state"), "google-widget-state");
+        const result = await api(
+          "/api/v1/oauth/token",
+          form({
+            code: back.searchParams.get("code"),
+            redirect_uri: APP_REDIRECT,
+            client_id: app.clientId,
+            client_secret: app.clientSecret,
+          }),
+        );
+        assert.equal(result.status, 200);
+        assert.equal(result.body.user.display_name, "google-widget on Google");
+        assert.deepEqual(result.body.accounts, []);
+      } finally {
+        await google.context.close();
+        await db.query(
+          "delete from users where id in (select user_id from user_logins where provider = 'google')",
+        );
+      }
+    });
+
+    await step(
+      "Google denial, wrong provider and callback replay cannot create a session",
+      async () => {
+        const start = () =>
+          fetch(`${HUB}/api/auth/start?platform=google&intent=login&return_to=/workspace`, {
+            redirect: "manual",
+          });
+        const response = await start();
+        const state = new URL(response.headers.get("location")).searchParams.get("state");
+        const denied = await fetch(
+          `${HUB}/api/auth/google/callback?error=access_denied&state=${state}`,
+          { redirect: "manual" },
+        );
+        assert.equal(denied.headers.get("set-cookie"), null);
+        assert.match(denied.headers.get("location"), /access_denied/);
+        const replay = await fetch(`${HUB}/api/auth/google/callback?code=attacker&state=${state}`, {
+          redirect: "manual",
+        });
+        assert.equal(replay.headers.get("set-cookie"), null);
+        assert.match(replay.headers.get("location"), /expired/);
+        const another = await start();
+        const mismatchState = new URL(another.headers.get("location")).searchParams.get("state");
+        const mismatch = await fetch(
+          `${HUB}/api/auth/callback/youtube?code=attacker&state=${mismatchState}`,
+          { redirect: "manual" },
+        );
+        assert.equal(mismatch.headers.get("set-cookie"), null);
+        assert.match(mismatch.headers.get("location"), /expired/);
+      },
+    );
 
     await step(
       "consent screen rejects an unregistered redirect_uri without redirecting",
@@ -741,6 +892,7 @@ async function main() {
         await alice.page.getByRole("button", { name: "Continue with Facebook" }).waitFor();
         await alice.page.getByRole("button", { name: "Create an account" }).waitFor();
         for (const label of [
+          "Google",
           "Instagram",
           "Facebook",
           "TikTok",

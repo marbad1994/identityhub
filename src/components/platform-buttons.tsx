@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { newRelayId, openPopup, waitForRelay } from "@/lib/popup";
 import { PlatformIcon } from "./marks";
 import { ErrorNote } from "./shell";
+import { platformInfo } from "@/lib/platforms";
 
 /**
  * Buttons into the platform OAuth flow (`/api/auth/start`). By default the
@@ -31,7 +32,11 @@ export function PlatformButtons({
   useEffect(() => () => cancel.current?.(), []);
 
   // Email and password is a form, not a redirect; callers render it separately.
-  platforms = platforms.filter((platform) => platform.id !== "password");
+  platforms = platforms.filter(
+    (platform) =>
+      platform.id !== "password" &&
+      (intent !== "connect" || !platformInfo(platform.id)?.identityOnly),
+  );
   if (platforms.length === 0) return null;
 
   const href = (id: string) =>

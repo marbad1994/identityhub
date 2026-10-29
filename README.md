@@ -2,7 +2,7 @@
 
 One login for the Makketing suite. People sign in with a social platform they already use or with an email and password, connect the other accounts they publish to, and choose which of those accounts each app (SocialPostAPI, Makketing, and later others) may use. Platform tokens stay encrypted on the hub; an app's server asks for one only when it needs to publish.
 
-Supported: X, Instagram, Facebook (one account per Page), TikTok, LinkedIn, YouTube, Reddit, and Snapchat (sign-in only: Snap has no posting API, so Snapchat accounts only ever carry `profile`). The OAuth details per platform mirror SocialPostAPI's connectors.
+Supported: Google (identity only; no YouTube channel needed), X, Instagram, Facebook (one account per Page), TikTok, LinkedIn, YouTube, Reddit, and Snapchat (sign-in only: Snap has no posting API, so Snapchat accounts only ever carry `profile`). The OAuth details per platform mirror SocialPostAPI's connectors.
 
 ## Widget design playground
 
@@ -49,7 +49,7 @@ Apps are registered under Apps with exact redirect URIs. The client secret is sh
 | Database | `DATABASE_URL` (Postgres) |
 | Public origin | `APP_ORIGIN`, e.g. `https://identityhub.makketing.com` |
 | Token encryption | `TOKEN_ENCRYPTION_KEY` (any long random string; AES-256-GCM key is derived from it) |
-| Platforms | `TWITTER_`, `INSTAGRAM_`, `FACEBOOK_`, `TIKTOK_`, `LINKEDIN_`, `YOUTUBE_`, `REDDIT_`, `SNAPCHAT_` + `CLIENT_ID` / `CLIENT_SECRET` |
+| Platforms | `GOOGLE_`, `TWITTER_`, `INSTAGRAM_`, `FACEBOOK_`, `TIKTOK_`, `LINKEDIN_`, `YOUTUBE_`, `REDDIT_`, `SNAPCHAT_` + `CLIENT_ID` / `CLIENT_SECRET` |
 | Facebook Page picker (optional) | `FACEBOOK_LOGIN_CONFIG_ID` |
 | Email (sign-up, reset, security notices) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS` (same names as SocialPostAPI). Email and password sign-in is offered only once `SMTP_HOST` and `SMTP_FROM_EMAIL` are set. |
 | Reuse SocialPostAPI's callbacks (optional) | `PLATFORM_CALLBACK_BASE`, e.g. `https://socialpostapi.makketing.com/api/connect` |
@@ -58,7 +58,9 @@ Apps are registered under Apps with exact redirect URIs. The client secret is sh
 
 The platform variable names match SocialPostAPI's, so the same developer apps serve both. A platform appears on the sign-in page once both of its values are set.
 
-**No new redirect URIs needed.** With `PLATFORM_CALLBACK_BASE=https://socialpostapi.makketing.com/api/connect`, the hub sends platforms SocialPostAPI's already-registered callback (`{base}/{platform}/callback`). The hub marks its OAuth states with the prefix `ihub_st_`; SocialPostAPI, with `IDENTITY_HUB_URL` set in its `.env`, forwards those callbacks unchanged to `{APP_ORIGIN}/api/auth/callback/{platform}`, and the hub exchanges the code with the same redirect URI. Without `PLATFORM_CALLBACK_BASE`, register `{APP_ORIGIN}/api/auth/callback/{platform}` on each platform instead. Snapchat is not in SocialPostAPI; register whichever callback the hub uses on its Snap Kit app.
+**Google sign-in:** register `https://identityhub.makketing.com/api/auth/google/callback` (or `{APP_ORIGIN}/api/auth/google/callback` on another deployment) as an authorized redirect URI on your Google web client. When both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are empty, the hub reuses the existing `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET`; set both Google values to use a dedicated client. Google requests only `openid profile`, creates a hub identity using Google’s stable subject, and discards its login token. It never requires a YouTube channel or grants publishing access. Existing users are not automatically merged by matching email. App owners can enable Google on the Widget tab; apps using all available methods include it automatically.
+
+**Publishing callbacks:** With `PLATFORM_CALLBACK_BASE=https://socialpostapi.makketing.com/api/connect`, the hub sends platforms SocialPostAPI's already-registered callback (`{base}/{platform}/callback`). The hub marks its OAuth states with the prefix `ihub_st_`; SocialPostAPI, with `IDENTITY_HUB_URL` set in its `.env`, forwards those callbacks unchanged to `{APP_ORIGIN}/api/auth/callback/{platform}`, and the hub exchanges the code with the same redirect URI. Without `PLATFORM_CALLBACK_BASE`, register `{APP_ORIGIN}/api/auth/callback/{platform}` on each platform instead. Snapchat is not in SocialPostAPI; register whichever callback the hub uses on its Snap Kit app.
 
 If the popup closes but IdentityHub keeps waiting, check the callback forwarder:
 

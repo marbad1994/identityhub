@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
 const steps = [
   [
     "Sign in",
-    "Log in with X, Instagram, Facebook, TikTok, LinkedIn, YouTube, Reddit or Snapchat, or with an email and password.",
+    "Log in with Google, X, Instagram, Facebook, TikTok, LinkedIn, YouTube, Reddit or Snapchat, or with an email and password.",
   ],
   ["Connect", "Add the other accounts you publish to. Tokens are encrypted and stay on the hub."],
   [

@@ -52,7 +52,7 @@ if [ -n "$spa_base" ]; then
   put PLATFORM_CALLBACK_BASE "${spa_base%/}/api/connect"
 fi
 
-for prefix in TWITTER INSTAGRAM FACEBOOK TIKTOK LINKEDIN YOUTUBE REDDIT SNAPCHAT; do
+for prefix in GOOGLE TWITTER INSTAGRAM FACEBOOK TIKTOK LINKEDIN YOUTUBE REDDIT SNAPCHAT; do
   put "${prefix}_CLIENT_ID" "$(get "${prefix}_CLIENT_ID" "$SOURCE")"
   put "${prefix}_CLIENT_SECRET" "$(get "${prefix}_CLIENT_SECRET" "$SOURCE")"
 done

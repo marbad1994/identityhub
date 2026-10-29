@@ -36,6 +36,7 @@ import { Route as AppsAppIdGrantsRouteImport } from './routes/apps.$appId.grants
 import { Route as AppsAppIdMembersRouteImport } from './routes/apps.$appId.members'
 import { Route as AppsAppIdWidgetRouteImport } from './routes/apps.$appId.widget'
 import { Route as ApiAuthCallbackPlatformRouteImport } from './routes/api/auth/callback.$platform'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiV1OauthRevokeRouteImport } from './routes/api/v1/oauth/revoke'
 import { Route as ApiV1OauthTokenRouteImport } from './routes/api/v1/oauth/token'
 import { Route as ApiV1RelayRelayIdRouteImport } from './routes/api/v1/relay.$relayId'
@@ -177,6 +178,11 @@ const ApiAuthCallbackPlatformRoute = ApiAuthCallbackPlatformRouteImport.update({
   path: '/api/auth/callback/$platform',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/api/auth/google/callback',
+  path: '/api/auth/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1OauthRevokeRoute = ApiV1OauthRevokeRouteImport.update({
   id: '/api/v1/oauth/revoke',
   path: '/api/v1/oauth/revoke',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
   '/apps/$appId/': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
   '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
   '/apps/$appId': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
   '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
@@ -300,6 +308,7 @@ export interface FileRoutesById {
   '/apps/$appId/widget': typeof AppsAppIdWidgetRoute
   '/apps/$appId/': typeof AppsAppIdIndexRoute
   '/api/auth/callback/$platform': typeof ApiAuthCallbackPlatformRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/v1/oauth/revoke': typeof ApiV1OauthRevokeRoute
   '/api/v1/oauth/token': typeof ApiV1OauthTokenRoute
   '/api/v1/relay/$relayId': typeof ApiV1RelayRelayIdRoute
@@ -336,6 +345,7 @@ export interface FileRouteTypes {
     | '/apps/$appId/widget'
     | '/apps/$appId/'
     | '/api/auth/callback/$platform'
+    | '/api/auth/google/callback'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
     | '/api/v1/relay/$relayId'
@@ -369,6 +379,7 @@ export interface FileRouteTypes {
     | '/apps/$appId/widget'
     | '/apps/$appId'
     | '/api/auth/callback/$platform'
+    | '/api/auth/google/callback'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
     | '/api/v1/relay/$relayId'
@@ -403,6 +414,7 @@ export interface FileRouteTypes {
     | '/apps/$appId/widget'
     | '/apps/$appId/'
     | '/api/auth/callback/$platform'
+    | '/api/auth/google/callback'
     | '/api/v1/oauth/revoke'
     | '/api/v1/oauth/token'
     | '/api/v1/relay/$relayId'
@@ -433,6 +445,7 @@ export interface RootRouteChildren {
   ApiAuthVerifyEmailRoute: typeof ApiAuthVerifyEmailRoute
   ApiV1MeRoute: typeof ApiV1MeRoute
   ApiAuthCallbackPlatformRoute: typeof ApiAuthCallbackPlatformRoute
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiV1OauthRevokeRoute: typeof ApiV1OauthRevokeRoute
   ApiV1OauthTokenRoute: typeof ApiV1OauthTokenRoute
   ApiV1RelayRelayIdRoute: typeof ApiV1RelayRelayIdRoute
@@ -631,6 +644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthCallbackPlatformRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/api/auth/google/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/oauth/revoke': {
       id: '/api/v1/oauth/revoke'
       path: '/api/v1/oauth/revoke'
@@ -712,6 +732,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthVerifyEmailRoute: ApiAuthVerifyEmailRoute,
   ApiV1MeRoute: ApiV1MeRoute,
   ApiAuthCallbackPlatformRoute: ApiAuthCallbackPlatformRoute,
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiV1OauthRevokeRoute: ApiV1OauthRevokeRoute,
   ApiV1OauthTokenRoute: ApiV1OauthTokenRoute,
   ApiV1RelayRelayIdRoute: ApiV1RelayRelayIdRoute,

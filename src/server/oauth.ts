@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { platformLabel } from "@/lib/platforms";
+import { platformInfo, platformLabel } from "@/lib/platforms";
 import { one, rows, tx } from "./db";
 import { encryptOptional, encryptSecret, pkcePair, randomToken, uid } from "./crypto";
 import { appOrigin } from "./env";
@@ -39,6 +39,13 @@ export async function beginAuthorization(input: {
   const p = platform(input.provider);
   const fallback = input.intent === "connect" ? "/workspace" : "/login";
   if (!p) return { location: withError(fallback, "That platform is not supported.") };
+  if (input.intent === "connect" && platformInfo(p.id)?.identityOnly)
+    return {
+      location: withError(
+        fallback,
+        "Google is a sign-in method. Connect YouTube to share a channel.",
+      ),
+    };
   const creds = credentials(p);
   if (!creds)
     return {
@@ -161,7 +168,7 @@ export async function finishAuthorization(provider: string, request: Request): P
       ),
     };
   }
-  const result = await settle(provider, url, pending, request);
+  const result = await settle(pending.provider, url, pending, request);
   if (!pending.relay_hash) return result;
   // The opener may still be on the IP address. The session belongs to APP_ORIGIN,
   // so a relative destination would send it back to a host with no session cookie.
