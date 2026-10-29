@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Fingerprint, LockKeyhole, ShieldCheck } from "lucide-react";
 import type { WidgetAppearance } from "@/lib/widget-appearance";
-import { widgetAppearance } from "@/lib/widget-appearance";
+import { accentPalette, widgetAppearance } from "@/lib/widget-appearance";
+import { cspNonce } from "@/lib/csp-nonce";
 import { Mark } from "./marks";
+import { WidgetMark } from "./widget-mark";
 
 /** The same welcome card on credential pages, in widget frames, and during consent. */
 export function AuthSurface({
@@ -21,13 +23,17 @@ export function AuthSurface({
   appearance?: WidgetAppearance;
   embed?: boolean;
 }) {
-  const design = widgetAppearance(appearance?.theme, appearance?.accent);
+  const design = widgetAppearance(appearance?.theme, appearance?.accent, appearance?.brand);
+  const palette = accentPalette(design.theme, design.accent);
   return (
     <div
       className={`ih-auth ${embed ? "ih-embedded" : ""}`}
       data-theme={design.theme}
       data-accent={design.accent}
     >
+      <style
+        nonce={cspNonce()}
+      >{`.ih-auth[data-theme="${design.theme}"][data-accent="${design.accent}"]{--ih-accent:${palette.accent};--ih-accent-soft:${palette.soft};--ih-on-accent:${palette.onAccent}}`}</style>
       {!embed ? (
         <header className="ih-brand-bar">
           <Link to="/" className="ih-brand">
@@ -46,13 +52,7 @@ export function AuthSurface({
             <span>Sign in with IdentityHub</span>
           </div>
           <div className="ih-card-body">
-            <div className="ih-monogram" aria-hidden="true">
-              {appName === "IdentityHub" ? (
-                <Fingerprint />
-              ) : (
-                `${Array.from(appName.trim())[0]?.toLowerCase() || "a"}.`
-              )}
-            </div>
+            <WidgetMark brand={design.brand} appName={appName} />
             <h1 id="auth-heading" className="ih-heading">
               {title}
             </h1>

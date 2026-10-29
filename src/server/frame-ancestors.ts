@@ -34,8 +34,9 @@ async function loadApp(clientId: string): Promise<Cached | null> {
     redirect_uris: string[];
     widget_theme: string;
     widget_accent: string;
+    widget_brand: unknown;
   }>(
-    `select name, homepage_url, redirect_uris, widget_theme, widget_accent from apps where client_id = $1`,
+    `select name, homepage_url, redirect_uris, widget_theme, widget_accent, widget_brand from apps where client_id = $1`,
     [clientId],
   );
   if (!app) {
@@ -45,7 +46,7 @@ async function loadApp(clientId: string): Promise<Cached | null> {
   const entry = {
     origins: originsOf(app.homepage_url, app.redirect_uris),
     name: app.name,
-    appearance: widgetAppearance(app.widget_theme, app.widget_accent),
+    appearance: widgetAppearance(app.widget_theme, app.widget_accent, app.widget_brand),
     expires: Date.now() + TTL_MS,
   };
   cache.set(clientId, entry);

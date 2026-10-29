@@ -20,7 +20,8 @@ import { listAccounts, type AccountView, type Result } from "./workspace";
 import { effectiveMethods, type MethodView } from "./methods";
 import { completeRelay, relayHash, validRelay } from "./relay";
 import { appOrigin, env } from "./env";
-import { widgetAppearance, type WidgetAppearance } from "@/lib/widget-appearance";
+import { accentPalette, widgetAppearance, type WidgetAppearance } from "@/lib/widget-appearance";
+import { publicWidgetBrand, type WidgetBrand } from "@/lib/widget-brand";
 
 const CODE_MINUTES = 10;
 /** Refresh a platform token this long before it expires. */
@@ -35,11 +36,12 @@ type AppRow = {
   sign_in_methods: string[];
   widget_theme: "light" | "dark";
   widget_accent: string;
+  widget_brand: WidgetBrand;
 };
 
 async function appByClientId(clientId: string): Promise<AppRow | undefined> {
   return one<AppRow>(
-    `select id, name, homepage_url, redirect_uris, client_secret_hash, sign_in_methods, widget_theme, widget_accent from apps where client_id = $1`,
+    `select id, name, homepage_url, redirect_uris, client_secret_hash, sign_in_methods, widget_theme, widget_accent, widget_brand from apps where client_id = $1`,
     [clientId],
   );
 }
@@ -53,6 +55,11 @@ export async function widgetConfig(clientId: string) {
     hub_origin: appOrigin(),
     theme: app.widget_theme,
     accent: app.widget_accent,
+    brand: publicWidgetBrand(app.widget_brand),
+    palette: accentPalette(
+      app.widget_theme,
+      widgetAppearance(app.widget_theme, app.widget_accent).accent,
+    ),
     methods: effectiveMethods(app.sign_in_methods),
     redirect_uris: app.redirect_uris,
     // WIDGET_MODAL=0 is the popup escape hatch. Unset stays the frame.
@@ -113,7 +120,7 @@ export async function consentView(
     name: app.name,
     homepageUrl: app.homepage_url,
     methods,
-    appearance: widgetAppearance(app.widget_theme, app.widget_accent),
+    appearance: widgetAppearance(app.widget_theme, app.widget_accent, app.widget_brand),
   };
   // An app that limits its platforms only sees accounts on those platforms.
   const platforms = new Set<string>(methods.map((method) => method.id));

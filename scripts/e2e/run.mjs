@@ -203,6 +203,17 @@ const api = (path, init = {}) =>
     status: response.status,
     body: await response.json(),
   }));
+
+async function savedWidget(clientId, predicate) {
+  for (let attempt = 0; attempt < 35; attempt++) {
+    const config = await (
+      await fetch(`${HUB}/api/v1/widget/${clientId}`, { cache: "no-store" })
+    ).json();
+    if (predicate(config)) return config;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error("Widget settings were not persisted");
+}
 const form = (values) => ({
   method: "POST",
   headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -795,6 +806,137 @@ async function main() {
     );
 
     await step(
+      "preset colors and the custom wheel persist across the preview, reload, and widget API",
+      async () => {
+        const colors = alice.page.getByRole("group", { name: "Accent color", exact: true });
+        assert.equal(await colors.getByRole("radio").count(), 13, "Twelve presets plus custom");
+        await alice.page.getByRole("radio", { name: "Rose", exact: true }).check();
+        await alice.page.getByText("All changes saved").waitFor();
+        let config = await savedWidget(app.clientId, (config) => config.accent === "rose");
+        assert.equal(config.accent, "rose");
+        await alice.page.getByRole("radio", { name: /Custom color/ }).check();
+        const wheel = alice.page.getByRole("slider", { name: "Custom color wheel", exact: true });
+        const initial = await alice.page.getByLabel("Hex color", { exact: true }).inputValue();
+        const bounds = await wheel.boundingBox();
+        await wheel.click({ position: { x: bounds.width * 0.8, y: bounds.height * 0.3 } });
+        assert.notEqual(
+          await alice.page.getByLabel("Hex color", { exact: true }).inputValue(),
+          initial,
+        );
+        await wheel.press("ArrowRight");
+        await wheel.press("ArrowUp");
+        await alice.page.getByRole("slider", { name: /^Brightness/ }).press("Home");
+        assert.equal(
+          await alice.page.getByLabel("Hex color", { exact: true }).inputValue(),
+          "#000000",
+        );
+        const hex = alice.page.getByLabel("Hex color", { exact: true });
+        await hex.fill("#bad");
+        await hex.blur();
+        await alice.page.getByRole("alert").filter({ hasText: "Enter six hex digits" }).waitFor();
+        await hex.fill("#2A9D8F");
+        await hex.blur();
+        await alice.page.getByText("All changes saved").waitFor();
+        config = await savedWidget(app.clientId, (config) => config.accent === "#2a9d8f");
+        assert.equal(config.accent, "#2a9d8f");
+        assert.equal(
+          await alice.page
+            .locator(".monogram")
+            .evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim()),
+          config.palette.accent,
+        );
+        await shot(alice.page, "custom-color-wheel");
+        await alice.page.setViewportSize({ width: 375, height: 812 });
+        assert.ok(
+          await alice.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        );
+        await shot(alice.page, "custom-color-wheel-mobile");
+        await alice.page.setViewportSize({ width: 1200, height: 900 });
+        await alice.page.reload();
+        assert.equal(
+          await alice.page.getByLabel("Hex color", { exact: true }).inputValue(),
+          "#2a9d8f",
+        );
+        assert.equal(
+          await alice.page.getByRole("radio", { name: /Custom color/ }).isChecked(),
+          true,
+        );
+      },
+    );
+
+    await step(
+      "no icon, icon gallery, uploaded logo, and removal persist in the real widget",
+      async () => {
+        await alice.page.getByRole("radio", { name: "No icon", exact: true }).check();
+        await savedWidget(app.clientId, (config) => config.brand.kind === "none");
+        assert.equal(await alice.page.locator(".monogram").count(), 0);
+        await alice.page.reload();
+        assert.equal(
+          await alice.page.getByRole("radio", { name: "No icon", exact: true }).isChecked(),
+          true,
+        );
+        await alice.page.getByRole("radio", { name: "Icon gallery", exact: true }).check();
+        await alice.page.getByRole("button", { name: "Rocket icon", exact: true }).click();
+        let config = await savedWidget(
+          app.clientId,
+          (config) => config.brand.kind === "icon" && config.brand.icon === "rocket",
+        );
+        assert.equal(
+          await alice.page.locator(".monogram svg path").getAttribute("d"),
+          config.brand.path,
+        );
+        await alice.page.getByRole("radio", { name: "Upload logo", exact: true }).check();
+        const upload = alice.page.getByLabel("Upload app logo", { exact: true });
+        await upload.setInputFiles({
+          name: "invalid.svg",
+          mimeType: "image/svg+xml",
+          buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+        });
+        await alice.page.getByRole("alert").filter({ hasText: "PNG, JPG, or WebP" }).waitFor();
+        const png = await alice.page.evaluate(() => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 480;
+          canvas.height = 320;
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#2a9d8f";
+          context.fillRect(10, 10, 460, 300);
+          return canvas.toDataURL("image/png");
+        });
+        await upload.setInputFiles({
+          name: "brand.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(png.split(",")[1], "base64"),
+        });
+        await alice.page.getByAltText("Uploaded logo preview").waitFor();
+        config = await savedWidget(app.clientId, (config) => config.brand.kind === "logo");
+        assert.ok(config.brand.dataUrl.startsWith("data:image/png;base64,"));
+        assert.equal(
+          await alice.page.locator(".monogram img").getAttribute("src"),
+          config.brand.dataUrl,
+        );
+        assert.equal(
+          await alice.page
+            .locator(".monogram img")
+            .evaluate((image) => image.complete && image.naturalWidth > 0),
+          true,
+        );
+        await shot(alice.page, "uploaded-logo");
+        await alice.page.reload();
+        await alice.page.getByAltText("Uploaded logo preview").waitFor();
+        await alice.page.getByRole("button", { name: "Remove uploaded logo" }).click();
+        await savedWidget(app.clientId, (config) => config.brand.kind === "initials");
+        assert.equal(await alice.page.locator(".monogram img").count(), 0);
+        await alice.page.getByRole("radio", { name: "Icon gallery", exact: true }).check();
+        await alice.page.getByRole("button", { name: "Leaf icon", exact: true }).click();
+        await savedWidget(
+          app.clientId,
+          (config) => config.brand.kind === "icon" && config.brand.icon === "leaf",
+        );
+        await shot(alice.page, "selected-icon");
+      },
+    );
+
+    await step(
       // localhost ports are same-site, so the Lax session is sent into the frame.
       // This is not a CHIPS test. See scripts/e2e/embed-cookies.mjs.
       "the copied widget on another site signs an email user in with state checked",
@@ -817,13 +959,41 @@ async function main() {
         const frame = carol.page.frameLocator('iframe[title="Sign in with Identity Hub"]');
         await frame.getByRole("button", { name: "Continue", exact: true }).waitFor();
         assert.equal(await frame.locator(".ih-auth").getAttribute("data-theme"), "dark");
-        assert.equal(await frame.locator(".ih-auth").getAttribute("data-accent"), "blue");
+        assert.equal(await frame.locator(".ih-auth").getAttribute("data-accent"), "#2a9d8f");
+        const selectedBrand = (await (await fetch(`${HUB}/api/v1/widget/${app.clientId}`)).json())
+          .brand;
+        assert.equal(
+          await frame.locator(".ih-monogram svg path").getAttribute("d"),
+          selectedBrand.path,
+        );
+        const palette = (await (await fetch(`${HUB}/api/v1/widget/${app.clientId}`)).json())
+          .palette;
+        assert.equal(
+          await frame
+            .locator(".ih-auth")
+            .evaluate((element) =>
+              getComputedStyle(element).getPropertyValue("--ih-accent").trim(),
+            ),
+          palette.accent,
+        );
         const [popup] = await Promise.all([
           carol.page.waitForEvent("popup"),
           frame.getByRole("button", { name: "Continue", exact: true }).click(),
         ]);
         await popup.getByRole("heading", { name: "Sign in to SocialPostAPI" }).waitFor();
-        assert.equal(await popup.locator(".ih-auth").getAttribute("data-accent"), "blue");
+        assert.equal(await popup.locator(".ih-auth").getAttribute("data-accent"), "#2a9d8f");
+        assert.equal(
+          await popup.locator(".ih-monogram svg path").getAttribute("d"),
+          selectedBrand.path,
+        );
+        assert.equal(
+          await popup
+            .locator(".ih-auth")
+            .evaluate((element) =>
+              getComputedStyle(element).getPropertyValue("--ih-accent").trim(),
+            ),
+          palette.accent,
+        );
         await popup.getByText("SocialPostAPI will only learn who you are.").waitFor();
         await shot(popup, "widget-popup");
         await popup.getByRole("button", { name: "Allow" }).click();

@@ -68,7 +68,7 @@
     return svg;
   }
 
-  function css(theme, accent) {
+  function css(theme, accent, suppliedPalette) {
     var dark = theme === "dark";
     var palette = {
       sage: dark ? ["#b9d6b9", "#2a3f30", "#16281c"] : ["#315d4c", "#e9f2e9", "#fff"],
@@ -78,6 +78,18 @@
     var chosen = Object.prototype.hasOwnProperty.call(palette, accent)
       ? palette[accent]
       : palette.sage;
+    // The API and builder share a contrast-aware palette. Only RGB hex values
+    // reach CSS, including for externally supplied mount configurations.
+    if (
+      suppliedPalette &&
+      [suppliedPalette.accent, suppliedPalette.soft, suppliedPalette.onAccent].every(
+        function (color) {
+          return typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color);
+        },
+      )
+    ) {
+      chosen = [suppliedPalette.accent, suppliedPalette.soft, suppliedPalette.onAccent];
+    }
     return `
       :host{all:initial;display:block;font-family:'Inter Variable',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         --bg:${dark ? "#1a2520" : "#fff"};--fg:${dark ? "#f0f4ef" : "#1a2925"};--muted:${dark ? "#b0bdb4" : "#5c6b63"};
@@ -91,6 +103,7 @@
       .panel{margin-top:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 24px 64px -24px #203b3433,0 4px 16px #203b3408}
       .topline{display:flex;align-items:center;gap:7px;padding:20px 26px 0;font-size:11px;color:var(--muted)}.topline svg{width:14px;height:14px}
       .content{padding:26px}.monogram{width:52px;height:52px;display:grid;place-items:center;margin:0 auto 22px;border-radius:14px;border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);font-size:30px;font-weight:650;letter-spacing:-1.5px}
+      .monogram svg{width:28px;height:28px}.monogram.logo{background:transparent;border:0;border-radius:0}.monogram.logo img{width:100%;height:100%;object-fit:contain}
       .title{margin:0;text-align:center;font-size:25px;line-height:1.25;font-weight:600;letter-spacing:-.8px;overflow-wrap:anywhere}.subtitle{margin:11px 0 24px;text-align:center;font-size:13px;line-height:1.7;color:var(--muted)}
       .methods{display:grid;gap:10px}.method{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:48px;padding:11px 15px;border:1px solid var(--control);border-radius:9px;font-size:14px;font-weight:600;color:var(--fg);background:var(--bg);transition:background .18s,border-color .18s}
       .method:hover{background:var(--soft);border-color:var(--accent)}.method.primary{background:var(--fg);border-color:var(--fg);color:var(--bg)}.method.primary:hover{opacity:.9}
@@ -252,7 +265,7 @@
     if (window.__ihubModal) window.__ihubModal.close();
     var host = document.createElement("div");
     var root = host.attachShadow({ mode: "open" });
-    installStyles(root, css(options.theme, options.accent) + modalCss());
+    installStyles(root, css(options.theme, options.accent, options.palette) + modalCss());
     var backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     var dialog = document.createElement("div");
@@ -543,10 +556,11 @@
     if (root._ihubCancel) root._ihubCancel();
     options.theme = config.theme;
     options.accent = config.accent;
+    options.palette = config.palette;
     while (root.firstChild) root.removeChild(root.firstChild);
     // A constructed stylesheet is not inline CSS, so a strict CSP on the host
     // page (style-src without 'unsafe-inline') does not block it.
-    installStyles(root, css(config.theme, config.accent));
+    installStyles(root, css(config.theme, config.accent, config.palette));
     var wrap = document.createElement("div");
     wrap.className = "wrap";
     var launcher = document.createElement("button");
@@ -577,7 +591,42 @@
     monogram.className = "monogram";
     monogram.setAttribute("aria-hidden", "true");
     monogram.textContent = (Array.from(config.name.trim())[0] || "a").toLowerCase() + ".";
-    content.appendChild(monogram);
+    var selectedBrand = config.brand || { kind: "initials" };
+    if (
+      selectedBrand.kind === "icon" &&
+      typeof selectedBrand.path === "string" &&
+      selectedBrand.path.length <= 1000
+    ) {
+      monogram.textContent = "";
+      var mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      mark.setAttribute("viewBox", "0 0 24 24");
+      mark.setAttribute("fill", "none");
+      mark.setAttribute("stroke", "currentColor");
+      mark.setAttribute("stroke-width", "1.6");
+      mark.setAttribute("stroke-linecap", "round");
+      mark.setAttribute("stroke-linejoin", "round");
+      var markPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      markPath.setAttribute("d", selectedBrand.path);
+      mark.appendChild(markPath);
+      monogram.appendChild(mark);
+    } else if (
+      selectedBrand.kind === "logo" &&
+      typeof selectedBrand.dataUrl === "string" &&
+      selectedBrand.dataUrl.length <= 174786 &&
+      /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(selectedBrand.dataUrl)
+    ) {
+      monogram.textContent = "";
+      monogram.classList.add("logo");
+      var logo = document.createElement("img");
+      logo.alt = "";
+      logo.src = selectedBrand.dataUrl;
+      logo.addEventListener("error", function () {
+        monogram.classList.remove("logo");
+        monogram.textContent = (Array.from(config.name.trim())[0] || "a").toLowerCase() + ".";
+      });
+      monogram.appendChild(logo);
+    }
+    if (selectedBrand.kind !== "none") content.appendChild(monogram);
     content.appendChild(title);
     var subtitle = document.createElement("p");
     subtitle.className = "subtitle";

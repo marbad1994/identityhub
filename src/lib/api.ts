@@ -1,5 +1,7 @@
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { isWidgetAccent } from "@/lib/widget-appearance";
+import { isWidgetBrand, type WidgetBrand } from "@/lib/widget-brand";
 
 /** Server functions the pages call. Each resolves the session from the request cookie. */
 
@@ -200,7 +202,14 @@ export const saveWidget = createServerFn({ method: "POST" })
       appId: z.string().max(64),
       methods: z.array(z.string().max(20)).max(20),
       theme: z.string().max(10),
-      accent: z.enum(["sage", "blue", "violet"]).optional(),
+      accent: z
+        .string()
+        .max(20)
+        .refine(isWidgetAccent, "Choose a preset or a six-digit hex color.")
+        .optional(),
+      brand: z
+        .custom<WidgetBrand>(isWidgetBrand, "Choose a built-in icon or upload a valid logo.")
+        .optional(),
     }),
   )
   .handler(async ({ context, data }) => {

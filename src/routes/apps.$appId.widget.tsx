@@ -7,7 +7,10 @@ import { ErrorNote } from "@/components/shell";
 import type { DeveloperAppView } from "@/server/workspace";
 import type { MethodView } from "@/server/methods";
 import { appHead } from "@/lib/app-title";
-import { WIDGET_ACCENTS, type WidgetAccent } from "@/lib/widget-appearance";
+import { accentPalette, type WidgetAccent } from "@/lib/widget-appearance";
+import { AccentPicker } from "@/components/accent-picker";
+import { BrandPicker } from "@/components/brand-picker";
+import { publicWidgetBrand, type WidgetBrand } from "@/lib/widget-brand";
 
 export const Route = createFileRoute("/apps/$appId/widget")({
   head: appHead("Widget"),
@@ -59,6 +62,7 @@ function WidgetBuilder({
   const [methods, setMethods] = useState<string[]>(() => app.methods.map((method) => method.id));
   const [theme, setTheme] = useState<"light" | "dark">(app.widgetTheme);
   const [accent, setAccent] = useState<WidgetAccent>(app.widgetAccent);
+  const [brand, setBrand] = useState<WidgetBrand>(app.widgetBrand);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [redirectUri, setRedirectUri] = useState(app.redirectUris[0] ?? "");
   const [scope, setScope] = useState("profile");
@@ -71,6 +75,7 @@ function WidgetBuilder({
   const methodsRef = useRef(methods);
   const themeRef = useRef(theme);
   const accentRef = useRef(accent);
+  const brandRef = useRef(brand);
   const timer = useRef<number | null>(null);
   const saving = useRef<Promise<boolean> | null>(null);
   const flushOwned = useRef(false);
@@ -78,6 +83,7 @@ function WidgetBuilder({
   methodsRef.current = methods;
   themeRef.current = theme;
   accentRef.current = accent;
+  brandRef.current = brand;
 
   const persist = (quiet: boolean): Promise<boolean> => {
     // The request in flight compares the refs when it settles and writes again
@@ -86,9 +92,11 @@ function WidgetBuilder({
     const nextMethods = methodsRef.current.slice();
     const nextTheme = themeRef.current;
     const nextAccent = accentRef.current;
+    const nextBrand = brandRef.current;
     const same = () =>
       themeRef.current === nextTheme &&
       accentRef.current === nextAccent &&
+      brandRef.current === nextBrand &&
       methodsRef.current.length === nextMethods.length &&
       methodsRef.current.every((id, index) => id === nextMethods[index]);
     if (nextMethods.length === 0) {
@@ -104,7 +112,13 @@ function WidgetBuilder({
       let saved = false;
       try {
         const result = await saveWidget({
-          data: { appId: app.id, methods: nextMethods, theme: nextTheme, accent: nextAccent },
+          data: {
+            appId: app.id,
+            methods: nextMethods,
+            theme: nextTheme,
+            accent: nextAccent,
+            brand: nextBrand,
+          },
         });
         saved = result.ok;
         if (!result.ok && mounted.current) {
@@ -170,9 +184,16 @@ function WidgetBuilder({
       redirectUri,
       scope,
       preview: true,
-      config: { name: app.name, theme, accent, methods: shown },
+      config: {
+        name: app.name,
+        theme,
+        accent,
+        palette: accentPalette(theme, accent),
+        brand: publicWidgetBrand(brand),
+        methods: shown,
+      },
     });
-  }, [ready, shown, theme, accent, redirectUri, scope, app.clientId, app.name, hubOrigin]);
+  }, [ready, shown, theme, accent, brand, redirectUri, scope, app.clientId, app.name, hubOrigin]);
 
   useEffect(() => {
     if (first.current) {
@@ -195,7 +216,7 @@ function WidgetBuilder({
       window.clearTimeout(id);
       if (timer.current === id) timer.current = null;
     };
-  }, [methods, theme, accent, app.id]);
+  }, [methods, theme, accent, brand, app.id]);
 
   const snippet = [
     `<div id="identity-hub"></div>`,
@@ -278,31 +299,8 @@ function WidgetBuilder({
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend className="text-sm font-semibold">Accent color</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {WIDGET_ACCENTS.map((value) => (
-                <label
-                  key={value}
-                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3"
-                >
-                  <input
-                    type="radio"
-                    name="accent"
-                    checked={accent === value}
-                    onChange={() => setAccent(value)}
-                  />
-                  <span
-                    className={`size-3 rounded-full ${value === "sage" ? "bg-[#315d4c]" : value === "blue" ? "bg-[#285b87]" : "bg-[#66508d]"}`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-sm font-medium">
-                    {{ sage: "Sage", blue: "Ocean", violet: "Iris" }[value]}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <AccentPicker value={accent} onChange={setAccent} />
+          <BrandPicker value={brand} onChange={setBrand} />
 
           <label className="block text-sm font-semibold">
             Return people to

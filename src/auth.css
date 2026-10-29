@@ -1,3 +1,22 @@
+.ih-color-wheel {
+  position: relative;
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, #fff, transparent),
+    conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  cursor: crosshair;
+  touch-action: none;
+}
+.ih-color-wheel > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
 .ih-auth {
   --ih-page: #f7f9f6;
   --ih-surface: #fff;
@@ -124,6 +143,16 @@
 .ih-monogram svg {
   width: 28px;
   height: 28px;
+}
+.ih-monogram.ih-logo {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.ih-monogram.ih-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .ih-heading {
   font-size: 26px;
